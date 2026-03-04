@@ -7,6 +7,7 @@ from datetime import datetime
 import logging as log 
 import multiprocessing as mp
 from tqdm import tqdm
+from pb_amarder import Progress
 from collections import defaultdict, Counter
 
 NPROC = 30
@@ -90,7 +91,8 @@ def main():
     grand_nslaac_total = 0                # total number of non-slaac addr
     grand_host_dict = defaultdict(list)   # dictionary (key: host_id, value: list of network_id)
     grand_host_counter = Counter()        # counter (key: host_id, value: times repeated)
-    pool = mp.Pool(NPROC)                 # create workers
+    tqdm.set_lock(mp.RLock())
+    pool = mp.Pool(NPROC, initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),))
     outfile = open(nslaac_filename, "w")  # create output file
     start_time = time.perf_counter()
 
@@ -118,7 +120,11 @@ def main():
             wr = pool.apply_async(write_non_slaac, (curr_chuck,))
             worker_rets.append(wr)
         
-        for wr in worker_rets:
+        # set pb for main process as it combines each worker's output
+        aggregater_pb = Progress(len(worker_rets), callback=lambda: f"Collected results from {ret_count} workers")
+        ret_count = 0
+        for wr in aggregater_pb.iterator(worker_rets):
+            ret_count += 1
             loc_nslaac_lines, loc_total, loc_nslaac_total, loc_host_dict, loc_host_counter = wr.get()
             outfile.write('\n'.join(loc_nslaac_lines)+'\n')
             grand_total += loc_total
@@ -137,10 +143,10 @@ def main():
     print(f"\nSUMMARY")
     print("="*55)
     print(f"Number of worker processes used {NPROC}")
-    print(f"All files processed in {end_time - start_time} seconds")
-    print(f"Total number of address processed: {grand_total}")
-    print(f"Total number of non-SLAAC address: {grand_nslaac_total}")
-    print(f"Percent of non-SLAAC address out of all: {grand_nslaac_total / grand_total}")
+    print(f"Files processed in {end_time - start_time} seconds")
+    print(f"Total number of addresses processed: {grand_total}")
+    print(f"Total number of v6 non-SLAAC addresses: {grand_nslaac_total}")
+    print(f"Percentage of non-SLAAC addresses out of all: {grand_nslaac_total / grand_total}")
     print(f"\nTop 20 most repeated host addresses")
     print(f"  {'Count':>15}   {'Host ID':>30}")
     print(f"  {'-'*15}   {'-'*35}")
