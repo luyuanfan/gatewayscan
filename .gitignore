@@ -1,4 +1,5 @@
 venv
 *.out
 *.csv
-data/
+data/*
+!data/small.csv
