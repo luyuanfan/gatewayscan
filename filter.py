@@ -35,7 +35,7 @@ filter out addresses generated with SLAAC by chunk
 '''
 def write_non_slaac(chunk):
     loc_total = 0
-    loc_slaac_total = 0
+    loc_nslaac_total = 0
     loc_host_dict = defaultdict(list)
     loc_host_counter = Counter()
     loc_nslaac_lines = []
@@ -58,23 +58,22 @@ def write_non_slaac(chunk):
 
         # filter out slaac addresses
         if is_slaac(full_addr):
-            loc_slaac_total += 1
+            continue
         else:
+            loc_nslaac_total += 1
             loc_nslaac_lines.append(line)
             network_id, host_id = split_ip(full_addr)
             loc_host_dict[host_id].append(network_id)
             loc_host_counter[host_id] += 1
         loc_total += 1
 
-    loc_nslaac_total = loc_total - loc_slaac_total
-    return loc_nslaac_lines, loc_total, loc_slaac_total, loc_host_dict, loc_host_counter
+    return loc_nslaac_lines, loc_total, loc_nslaac_total, loc_host_dict, loc_host_counter
 
 '''
 process all data
 main process hands chucks to worker processes
 '''
 def main():
-
     # get and validate names of input files
     if len(sys.argv) < 2:
         print("Usage: python3 filter.py <input1.csv.bz2> <input2.csv.bz2> ...")
@@ -88,11 +87,11 @@ def main():
             sys.exit(1)
 
     grand_total = 0                       # total number of addr
-    grand_slaac_total = 0                 # total number of slaac addr
+    grand_nslaac_total = 0                # total number of non-slaac addr
     grand_host_dict = defaultdict(list)   # dictionary (key: host_id, value: list of network_id)
     grand_host_counter = Counter()        # counter (key: host_id, value: times repeated)
     pool = mp.Pool(NPROC)                 # create workers
-    outfile = open(nslaac_filename, "w")  # create shared output file
+    outfile = open(nslaac_filename, "w")  # create output file
     start_time = time.perf_counter()
 
     for filepath in sys.argv[1:]:
@@ -112,18 +111,18 @@ def main():
             if len(curr_chuck) <= CHUCK_SIZE:
                 curr_chuck.append(line)
             else:
-                worker_ret = pool.apply_async(write_non_slaac, (curr_chuck,))
-                worker_rets.append(worker_ret)
+                wr = pool.apply_async(write_non_slaac, (curr_chuck,))
+                worker_rets.append(wr)
                 curr_chuck = []
         if curr_chuck:
-            worker_ret = pool.apply_async(write_non_slaac, (curr_chuck,))
-            worker_rets.append(worker_ret)
+            wr = pool.apply_async(write_non_slaac, (curr_chuck,))
+            worker_rets.append(wr)
         
         for wr in worker_rets:
-            loc_nslaac_lines, loc_total, loc_slaac_total, loc_host_dict, loc_host_counter = wr.get()
+            loc_nslaac_lines, loc_total, loc_nslaac_total, loc_host_dict, loc_host_counter = wr.get()
             outfile.write('\n'.join(loc_nslaac_lines)+'\n')
             grand_total += loc_total
-            grand_slaac_total += loc_slaac_total
+            grand_nslaac_total += loc_nslaac_total
             for host_id, network_ids in loc_host_dict.items():
                 grand_host_dict[host_id].extend(network_ids)
             grand_host_counter += loc_host_counter
@@ -140,14 +139,14 @@ def main():
     print(f"Number of worker processes used {NPROC}")
     print(f"All files processed in {end_time - start_time} seconds")
     print(f"Total number of address processed: {grand_total}")
-    print(f"Total number of SLAAC address: {grand_slaac_total}")
-    print(f"Total number of non-SLAAC address: {grand_total - grand_slaac_total}")
+    print(f"Total number of non-SLAAC address: {grand_nslaac_total}")
+    print(f"Percent of non-SLAAC address out of all: {grand_nslaac_total / grand_total}")
     print(f"\nTop 20 most repeated host addresses")
-    print(f"  {'Count':>15}  {'Host ID':>30}")
+    print(f"  {'Count':>15}   {'Host ID':>30}")
     print(f"  {'-'*15}   {'-'*35}")
     for host_id, count in grand_host_counter.most_common(20):
         formatted = f"{host_id[0:4]}:{host_id[4:8]}:{host_id[8:12]}:{host_id[12:16]}"
-        print(f"  {count:>15,}   {formatted:>35}")
+        print(f"  {count:>15,}    {formatted:>35}")
         
 if __name__ == "__main__":
     main()
