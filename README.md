@@ -1,22 +1,12 @@
 ipv6 scan analysis using jupyter notebook
 
-run:
+Set up environment:
 ```bash
 source venv/bin/activate
 pip install -r requirements.txt
-jupyter notebook
 ```
 
-- `filter.py` filters out all non-SLAAC addresses.
-
-TODO:
-- We want to collect all the non-SLAAC addresses.
-- For each address, we want to count how many times each of them is repeated
-  - With that, we want to count how many times
-- Want to verify that the parallelized workflow is producing the correct result (so we might want a little playground of which the result can be verified through other methods).
-- We probably needs two passes through the file. First time we just filter? Ok but maybe also we can keep a counter for all the non-slaac addresses. Maybe all the processes can share a big dictionary that's free to read, and lock it when writing. 
-
-Ideas:
-- At the filtering step 
-  - We can have multiple concurrent processes, and each process a portion of the large file.
-  - And then maybe we can write them to the same file, not caring about the order? Although I feel like we should write to separate files and then append them together because I think we do care about locality.
+Collect data: 
+```bash
+nohup python3 main.py /mnt/usb/combined-48s-r1-s56.csv.bz2 /mnt/usb/combined-48s-r2-s60.csv.bz2 /mnt/usb/combined-48s-r3-output.csv.bz2 &
+```

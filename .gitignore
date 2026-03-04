@@ -3,3 +3,4 @@ venv
 *.csv
 data/*
 !data/small.csv
+notes.md

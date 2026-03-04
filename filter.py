@@ -101,7 +101,7 @@ def main():
         result_objs = []
 
         infile = open_func(filepath, "rt")
-        for line in infile:
+        for line in tqdm(infile):
             line = line.strip()
             if line.startswith("#"): continue
             if len(curr_chuck) <= CHUCK_SIZE:
