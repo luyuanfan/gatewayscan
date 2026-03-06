@@ -1,3 +1,7 @@
+-- i lowkey don't think shannon entropy is a good idea because 
+-- it does not account for the location at which things appear,
+-- but only the probability
+
 CREATE FUNCTION shannon_bin(hid text)
   RETURNS float
 AS $$
