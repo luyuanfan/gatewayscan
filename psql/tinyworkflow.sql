@@ -3,13 +3,14 @@ CREATE TABLE tinyRouterIPs (
     TgtIP            text,       -- inet datatype ain't too versatile
     SrcIP            text,       -- inet datatype ain't too versatile
     HopLim           smallint,   -- depends, prolly won't go over 32767
-    ICMPv6Type       smallint,   -- 8 bits
-    ICMPv6Code       smallint,   -- 8 bits
-    Flags            smallint,   -- 8 bits
+    ICMPv6Type       smallint,   -- 8 bits (only for ICMP protocol)
+    ICMPv6Code       smallint,   -- 8 bits (only for ICMP protocol)
+    Flags            smallint,   -- 8 bits (only for TCP protocol)
     RTT              integer,    -- in (millieseconds)
+    -- self-defined columns
     Entropy          float(24),  -- entropy score
     PfxLen           integer,    -- which subnet it's sitting on
-    RouterType       boolean     -- 1 for yes 0 for no
+    RouterType       boolean     -- 1 for v6 0 for v4
     -- placeholder for HostID which will be inserted later
     -- placeholder for NetID which will also be inserted later
 );
@@ -18,8 +19,6 @@ CREATE TABLE tinyRouterIPs (
 CREATE EXTENSION plpython3u;
 
 -- define functions
-/* 
- */
 CREATE FUNCTION get_hid(addr text)
   RETURNS text
 AS $$
@@ -63,7 +62,7 @@ INSERT INTO tinyRouterIPs VALUES (true, '2607:5380:1470:be58:8647:6e47:456e:bfc2
 INSERT INTO tinyRouterIPs VALUES (true, '2607:fa49:1c42:3f18:8647:6e47:456e:bfc2', '2607:fa48:c:9500:64c2:882:e885:89bb', NULL, NULL, 46, 1, 0, NULL, 125, NULL, 48, true);
 INSERT INTO tinyRouterIPs VALUES (true, '2a01:cb08:9150:4a2b:8647:6e47:456e:bfc2', '2a01:cb08:9150:4a00:c2d7:aaff:febf:34f1', NULL, NULL, 239, 1, 0, NULL, 197, NULL, 48, true);
 
--- TODO: might wanna add a func that filter out v4 addresses
+-- TODO: wanna add a func that filter out v4 addresses
 --       but that can also be done through views i guess
 
 -- process ips into manageable state
