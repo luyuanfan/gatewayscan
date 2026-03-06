@@ -8,7 +8,7 @@ from math import log2
 '''
 def shannon_hex(hid):
     c = Counter(hid)
-    score = - sum([(c[val] / 16) * log2(c[val] / 16) for val in c.keys()])
+    score = - sum([(val / 16) * log2(val / 16) for key, val in c.items()])
     return score
 
 '''
@@ -17,7 +17,7 @@ def shannon_hex(hid):
 def shannon_bin(hid):
     binary = bin(int(hid, 16))[2:].zfill(64)
     c = Counter(binary)
-    score = - sum([(c[val] / 64) * log2(c[val] / 64) for val in c.keys()])
+    score = - sum([(val / 64) * log2(val / 64) for key, val in c.items()])
     return score
 
 def main():
@@ -34,9 +34,8 @@ def main():
         "0468ac7db32e9f15", # same as above but in different order
     ]
     for hid in hex_host_ids: 
-        # print(f"{hid} --> {shannon_hex(hid)}")
         print(f"{hid} --> {shannon_bin(hid)}")
-    
+        # print(f"{" "*len(hid)} --> {shannon_hex(hid)} hex")
 
 if __name__ == "__main__":
     main()
