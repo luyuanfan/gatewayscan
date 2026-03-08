@@ -7,7 +7,6 @@ CREATE TABLE smallRouterIPs (
     ICMPv6Code       smallint,   -- 8 bits (only for ICMP protocol)
     Flags            smallint,   -- 8 bits (only for TCP protocol)
     RTT              integer     -- in (millieseconds)
-    -- self-defined columns: 
     -- Entropy       float(24),  -- entropy score
     -- PfxLen        smallint,   -- which subnet it's sitting on
     -- IPType        boolean,    -- 1 for v6 0 for v4
@@ -21,6 +20,9 @@ ALTER TABLE smallRouterIPs ADD COLUMN PfxLen smallint;
 ALTER TABLE smallRouterIPs ADD COLUMN IPType boolean;
 ALTER TABLE smallRouterIPs ADD COLUMN HostID text;
 ALTER TABLE smallRouterIPs ADD COLUMN NetID text;
+
+-- this part is completely manual 
+UPDATE smallRouterIPs SET PfxLen = 56; 
 
 -- process source ips, delete v4 rows, expand the rest, delete slaac rows
 -- UPDATE smallRouterIPs SET IPType = is_v6(SrcIP);
