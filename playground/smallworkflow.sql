@@ -22,7 +22,7 @@ ALTER TABLE smallRouterIPs ADD COLUMN HostID text;
 ALTER TABLE smallRouterIPs ADD COLUMN NetID text;
 
 -- this part is completely manual 
-UPDATE smallRouterIPs SET PfxLen = 56; 
+UPDATE smallRouterIPs SET PfxLen = 56;
 
 -- process source ips, delete v4 rows, expand the rest, delete slaac rows
 -- UPDATE smallRouterIPs SET IPType = is_v6(SrcIP);
@@ -38,15 +38,3 @@ UPDATE smallRouterIPs SET NetID = get_nid(SrcIP);
 
 -- UPDATE smallRouterIPs SET entropy = shannon_bin(HostID);
 UPDATE smallRouterIPs SET entropy = shannon_hex(HostID);
-
--- SELECT COUNT(*)
---     FROM (
---         SELECT DISTINCT HostID
---         FROM smallRouterIPs
---     ) AS temp;
-
-SELECT HostID
-    FROM (
-        SELECT DISTINCT HostID
-        FROM smallRouterIPs
-    ) AS tmp;
