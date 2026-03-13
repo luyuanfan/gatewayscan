@@ -47,13 +47,14 @@ AS $$
   return score
 $$ LANGUAGE plpython3u;
 
-CREATE FUNCTION shannon_hex(hid text)
+-- normalized shannon entropy over hex numbers
+CREATE FUNCTION entropy_hex(hid text)
   RETURNS float
 AS $$
   from collections import Counter
   from math import log2
   c = Counter(hid)
-  score = - sum([(val / 16) * log2(val / 16) for key, val in c.items()])
+  score = (- sum([(val / 16) * log2(val / 16) for _ , val in c.items()]))/4
   return score
 $$ LANGUAGE plpython3u;
 
