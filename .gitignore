@@ -4,3 +4,5 @@ venv
 data/*
 !data/small.csv
 notes.md
+*.pfx2as
+*.txt
