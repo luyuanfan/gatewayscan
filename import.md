@@ -22,8 +22,15 @@ Take `small.csv` as example:
 CSV="data/small.csv"
 TBL="smallRouterIPs"
 psql -h localhost -p 6789 -c "\COPY $TBL (Protocol, TgtIP, SrcIP, HopLim, ICMPv6Type, ICMPv6Code, RTT) FROM STDIN WITH (FORMAT csv)"< <(grep '^icmp,' "$CSV")
-# psql -h localhost -p 6789 -c "\COPY $TBL (Protocol, TgtIP, SrcIP, HopLim, Flags, RTT) FROM STDIN WITH (FORMAT csv)"< <(grep '^tcp,' "$CSV")
-psql -h localhost -p 6789 -c "UPDATE $TBL SET PfxLen = 56, Deleted = false;"
+psql -h localhost -p 6789 -c "UPDATE $TBL SET PfxLen = 56;"
+```
+
+Take `medium.csv` as example:
+```bash
+CSV="data/medium.csv"
+TBL="RouterIPs"
+psql -h localhost -p 6789 -c "\COPY $TBL (Protocol, TgtIP, SrcIP, HopLim, ICMPv6Type, ICMPv6Code, RTT) FROM STDIN WITH (FORMAT csv)"< <(grep '^icmp,' "$CSV")
+psql -h localhost -p 6789 -c "UPDATE $TBL SET PfxLen = 56;"
 ```
 
 ## Import compressed CSV files
