@@ -16,6 +16,15 @@ AS $$
   return addr[:16]
 $$ LANGUAGE plpython3u;
 
+-- just get the probed subnet address
+CREATE FUNCTION get_subnet_pfx(addr text, pfxlen smallint)
+  RETURNS text
+AS $$
+  import ipaddress
+  probed_pfx = ipaddress.IPv6Network(f"{addr}/{pfxlen}", strict=False)
+  return probed_pfx.network_address
+$$ LANGUAGE plpython3u;
+
 -- expand an ipv6 address to its full 32-character form
 -- with no colons or shorthand notation
 --   @addr: compressed ipv6 address (e.g. 2001:db8::1)
