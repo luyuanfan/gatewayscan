@@ -26,13 +26,25 @@ psql -h localhost -p 6789 -c "UPDATE $TBL SET Deleted = false;"
 ## Import compressed CSV files
 Take `/mnt/usb/combined-48s-r1-s56.csv.bz2` as example:
 ```bash
-BZ="/mnt/usb/combined-48s-r1-s56.csv.bz2"
-CSV="${BZ%.bz2}"
-lbzip2 -dk -n $(nproc) $BZ > /tmp/$CSV # decompress file
-sed -i -e 1,4d /tmp/$CSV # strip first four lines (comments)
-psql -h localhost -p 6789 -c "\COPY routerIPs (Protocol, TgtIP, SrcIP, HopLim, ICMPv6Type, ICMPv6Code, RTT) FROM STDIN WITH (FORMAT csv)"< <(grep '^icmp,' "$CSV")
-psql -h localhost -p 6789 -c "\COPY routerIPs (Protocol, TgtIP, SrcIP, HopLim, Flags, RTT) FROM STDIN WITH (FORMAT csv)"< <(grep '^tcp,' "$CSV")
-psql -h localhost -p 6789 -c "UPDATE routerIPs SET PfxLen = 56;"
+# file 1
+BZ1="combined-48s-r1-s56.csv.bz2" # set input file
+CSV1="${BZ1%.bz2}" # set output file
+lbzip2 -dkc -n $(nproc) /mnt/usb/$BZ1 > /tmp/$CSV1 # decompress input
+psql -h localhost -p 6789 -c "\COPY routerIPs (Protocol, TgtIP, SrcIP, HopLim, ICMPv6Type, ICMPv6Code, RTT) FROM STDIN WITH (FORMAT csv)"< <(grep '^icmp,' "/tmp/$CSV1") # load into DB
+psql -h localhost -p 6789 -c "UPDATE routerIPs SET PfxLen = 56 WHERE PfxLen IS NULL;" # set prefix length
+# file 2
+BZ2="combined-48s-r2-s60.csv.bz2"
+CSV2="${BZ2%.bz2}"
+lbzip2 -dkc -n $(nproc) /mnt/usb/$BZ2 > /tmp/$CSV2
+psql -h localhost -p 6789 -c "\COPY routerIPs (Protocol, TgtIP, SrcIP, HopLim, ICMPv6Type, ICMPv6Code, RTT) FROM STDIN WITH (FORMAT csv)"< <(grep '^icmp,' "/tmp/$CSV2")
+psql -h localhost -p 6789 -c "UPDATE routerIPs SET PfxLen = 60 WHERE PfxLen IS NULL;"
+# file 3
+BZ3="combined-48s-r3-output.csv.bz2" 
+CSV3="${BZ3%.bz2}"
+lbzip2 -dkc -n $(nproc) /mnt/usb/$BZ3 > /tmp/$CSV3
+psql -h localhost -p 6789 -c "\COPY routerIPs (Protocol, TgtIP, SrcIP, HopLim, ICMPv6Type, ICMPv6Code, RTT) FROM STDIN WITH (FORMAT csv)"< <(grep '^icmp,' "/tmp/$CSV3")
+psql -h localhost -p 6789 -c "UPDATE routerIPs SET PfxLen = 64 WHERE PfxLen IS NULL;"
+# set soft delete column to false
 psql -h localhost -p 6789 -c "UPDATE routerIPs SET Deleted = false;"
 ```
 
