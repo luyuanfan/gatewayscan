@@ -27,7 +27,7 @@ CREATE TABLE pfx2as (
     ASN           text
 );
 
-CREATE TABLE pfx2as2org
+CREATE TABLE as2org
     AS (
         SELECT asf.aut, asf.autname, orgf.orgname, asf.orgid, orgf.country
         FROM asfields AS asf
