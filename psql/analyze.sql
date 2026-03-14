@@ -24,22 +24,35 @@ SELECT hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
     WHERE deleted = false AND entropy >= 0.5
     GROUP BY hostid
 	HAVING COUNT(*) > 1
-    ORDER BY host_id_count DESC, entropy_score DESC;
+    ORDER BY entropy_score DESC, host_id_count DESC;
 
-SELECT netid, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
+SELECT subnetpfx, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
     FROM routerips
     WHERE deleted = false AND entropy >= 0.5
-    GROUP BY netid, hostid
+    GROUP BY subnetpfx, hostid
 	HAVING COUNT(*) > 1
-    ORDER BY host_id_count DESC, entropy_score DESC;
-
+    ORDER BY entropy_score DESC, host_id_count DESC;
 
 -- map network ids to AS numbers 
 SELECT * FROM pfx2as JOIN (
-    SELECT netid, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
+    SELECT subnetpfx, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
     FROM routerips
     WHERE deleted = false AND entropy >= 0.5
-    GROUP BY netid, hostid
+    GROUP BY subnetpfx, hostid
 	HAVING COUNT(*) > 1
     ORDER BY host_id_count DESC, entropy_score DESC
-) ON prefix = netid;
+) ON prefix = subnetpfx;
+
+-- join above to my as2org table
+SELECT sub.subnetpfx, sub.hostid, sub.host_id_count, sub.entropy_score,
+       p1.asn, p2.autname, p2.orgname, p2.country
+FROM (
+    SELECT subnetpfx, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
+    FROM routerips
+    WHERE deleted = false AND entropy >= 0.5
+    GROUP BY subnetpfx, hostid
+    HAVING COUNT(*) > 1
+    ORDER BY host_id_count DESC, entropy_score DESC
+) AS sub
+JOIN pfx2as AS p1 ON sub.subnetpfx <<= p1.prefix::cidr
+JOIN pfx2as2org AS p2 ON p1.asn = p2.aut;

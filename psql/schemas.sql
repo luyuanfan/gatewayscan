@@ -1,3 +1,19 @@
+CREATE TABLE RouterIPs (
+    Protocol         text,                  -- protocol type: ICMP or TCP
+    TgtIP            text,                  -- ICMP probe target IP
+    SrcIP            text,                  -- IP of the replier 
+    PfxLen           smallint,              -- subnet prefix length
+    SubnetPfx        cidr,                  -- subnet prefix 
+    Entropy          real,                  -- entropy score
+    HostID           text,                  -- host id
+    IDBuffer         text,                  -- network id
+    HopLim           smallint,              -- Hop Limit
+    ICMPv6Type       smallint,              -- 8 bits
+    ICMPv6Code       smallint,              -- 8 bits
+    RTT              integer,               -- round trip time (in millieseconds)
+    Deleted          boolean DEFAULT false  -- flag if a row is soft deleted
+);
+
 CREATE TABLE orgFields (
     orgId          text 
                    PRIMARY KEY,         -- unique ID for the given organization
