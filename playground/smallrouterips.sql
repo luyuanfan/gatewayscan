@@ -1,12 +1,11 @@
 CREATE TABLE smallRouterIPs (
     Protocol         text,                  -- protocol type: ICMP or TCP
-    TgtIP            text,                  -- ICMP probe target IP
-    SrcIP            text,                  -- IP of the replier 
+    TgtIP            inet,                  -- ICMP probe target IP
+    SrcIP            inet,                  -- IP of the replier 
     SubnetPfx        cidr,                  -- subnet prefix 
     HopLim           smallint,              -- Hop Limit
-    ICMPv6Type       smallint,              -- 8 bits (only for ICMP protocol)
-    ICMPv6Code       smallint,              -- 8 bits (only for ICMP protocol)
-    Flags            smallint,              -- 8 bits (only for TCP protocol)
+    ICMPv6Type       smallint,              -- 8 bits
+    ICMPv6Code       smallint,              -- 8 bits
     RTT              integer,               -- round trip time (in millieseconds)
     Deleted          boolean DEFAULT false, -- flag if a row is soft deleted
     Entropy          real,                  -- entropy score
@@ -21,30 +20,23 @@ CREATE TABLE smallRouterIPs (
 -- remove replies from aliased networks and v4 routers addresses
 UPDATE smallrouterIPs
     SET Deleted = true
-    WHERE TgtIP = SrcIP
-          OR SrcIP !~ ':';
+    WHERE TgtIP = SrcIP OR family(SrcIP) = 4;
 
 -- expand the rest of the router addresses
 UPDATE smallrouterIPs
-    SET IDBuffer = exploded(SrcIP)
+    SET HostID = right(encode(substring(inet_send(SrcIP) from 5), 'hex'), 16)
     WHERE Deleted = false;
 
 -- remove SLAAC generated addresses
 UPDATE smallrouterIPs
     SET Deleted = true
-    WHERE is_slaac(IDBuffer) AND Deleted = false;
-
--- add index on column: deleted
-CREATE INDEX ActiveRows ON smallrouterIPs (Deleted);
+    WHERE substring(HostID from 7 for 4) = 'fffe' AND Deleted = false;
 
 -- get network id, host id, and calculate entropy score on host id
 UPDATE smallrouterIPs
-    SET HostID = right(IDBuffer, 16),
-        Entropy = entropy_hex(right(IDBuffer, 16)),
-        SubnetPfx = set_masklen(SrcIP::inet, PfxLen)::cidr
+    SET Entropy = entropy_hex(HostID),
+        SubnetPfx = set_masklen(SrcIP, PfxLen)::cidr
     WHERE Deleted = false;
-
-ALTER TABLE smallRouterIPs DROP COLUMN IDBuffer;
 
 SELECT hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
     FROM smallrouterips

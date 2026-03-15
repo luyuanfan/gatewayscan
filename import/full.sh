@@ -3,21 +3,8 @@
 DB="psql -h localhost -p 6789"
 TBL="routerIPs"
 echo "creating table $TBL"
-$DB -c "CREATE TABLE $TBL (
-    Protocol         text,                  -- protocol type: ICMP or TCP
-    TgtIP            text,                  -- ICMP probe target IP
-    SrcIP            text,                  -- IP of the replier 
-    PfxLen           smallint,              -- subnet prefix length
-    SubnetPfx        cidr,                  -- subnet prefix 
-    Entropy          real,                  -- entropy score
-    HostID           text,                  -- host id
-    IDBuffer         text,                  -- network id
-    HopLim           smallint,              -- Hop Limit
-    ICMPv6Type       smallint,              -- 8 bits
-    ICMPv6Code       smallint,              -- 8 bits
-    RTT              integer,               -- round trip time (in millieseconds)
-    Deleted          boolean DEFAULT false  -- flag if a row is soft deleted
-);"
+$DB -v tbl=$TBL -f psql/routerips-schema.sql
+
 # file 1
 BZ1="combined-48s-r1-s56.csv.bz2" # set input file
 CSV1="${BZ1%.bz2}" # set output file
