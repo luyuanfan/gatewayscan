@@ -1,4 +1,4 @@
-CREATE TABLE RouterIPs (
+CREATE TABLE routerIPs (
     Protocol         text,                  -- protocol type: ICMP or TCP
     TgtIP            text,                  -- ICMP probe target IP
     SrcIP            text,                  -- IP of the replier 

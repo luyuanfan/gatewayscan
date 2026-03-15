@@ -1,8 +1,8 @@
 #!/bin/bash
 DB="psql -h localhost -p 6789"
-FNAME="../data/20250801.as-org2info.txt"
-FAS="../data/asfields.txt"
-FORG="../data/orgfields.txt"
+FNAME="data/20250801.as-org2info.txt"
+FAS="data/asfields.txt"
+FORG="data/orgfields.txt"
 LINE=$(grep -n "format:aut" $FNAME | cut -d ":" -f 1)
 head -n $((LINE-1)) $FNAME > $FORG
 sed -i '/^#/d' $FORG

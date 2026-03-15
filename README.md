@@ -12,6 +12,6 @@ DB:
 
 File locations:
 - Import instruction is in `./import.md`
-- `routerIPs` processing queries are in `./psql/routerips.sql`
+- `routerIPs` processing queries are in `./psql/process.sql`
 - `pfx2as`, `asfields`, `orgfields` processing queries are in `./psql/pfx2as2org.sql`
 - `./playground/` holds test files
