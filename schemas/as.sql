@@ -1,4 +1,4 @@
-CREATE TABLE :tbl (
+CREATE TABLE asFields (
     aut            text,             -- AS number
     dateChanged    date,             -- the changed date provided by WHOIS
     autName        text,             -- the name provide for the AS number

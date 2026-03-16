@@ -35,3 +35,10 @@ UPDATE :tbl
             GROUP BY SrcIP
             HAVING COUNT(SrcIP) > 1
         );
+
+DROP TABLE IF EXISTS clean_routerips;
+
+/echo ''
+CREATE TABLE clean_routerips AS
+SELECT * FROM routerips
+    WHERE deleted = false;

@@ -1,21 +1,30 @@
 #!/bin/bash
-DB="psql -h localhost -p 6789"
-FNAME="data/20250801.as-org2info.txt"
-FAS="data/asfields.txt"
-FORG="data/orgfields.txt" 
-LINE=$(grep -n "format:aut" $FNAME | cut -d ":" -f 1)
-head -n $((LINE-1)) $FNAME > $FORG
-sed -i '/^#/d' $FORG
-tail -n +$LINE $FNAME > $FAS
-sed -i '/^#/d' $FAS
+db="psql -h localhost -p 6789"
 
-FORG="data/orgfields.txt"
-TORG="orgFields"
-TAS="asFields"
-$DB -c "DROP TABLE IF EXISTS $TAS;"
-$DB -c "DROP TABLE IF EXISTS $TORG;"
-$DB -v tbl=$TORG -f schemas/org.sql
-$DB -c "\COPY $TORG FROM $FORG WITH (DELIMITER '|', FORMAT text, NULL '')"
-FAS="data/asfields.txt"
-$DB -v tbl=$TAS -f schemas/as.sql
-$DB -c "\COPY $TAS FROM $FAS WITH (DELIMITER '|', FORMAT text, NULL '')"
+location='https://data.caida.org/datasets/as-organizations/20250801.as-org2info.txt.gz'
+fpath=data/${location##*/}
+txt=${fpath%%.gz*}
+wget -P data/ $location
+gunzip -f $fpath
+line=$(grep -n "format:aut" $txt | cut -d ":" -f 1)
+fas="data/asfields.txt"
+forg="data/orgfields.txt"
+rm -f $fas
+rm -f $forg
+head -n $((line-1)) $txt > $forg
+tail -n +$line $txt > $fas
+
+$db -c "DROP TABLE IF EXISTS asFields;" >/dev/null
+$db -c "DROP TABLE IF EXISTS orgFields;" >/dev/null
+$db -f schemas/org.sql
+$db -c "\COPY orgFields FROM STDIN WITH (DELIMITER '|', FORMAT text, NULL '')"< <(grep -v '^#' "$forg")
+$db -f schemas/as.sql
+$db -c "\COPY asFields FROM STDIN WITH (DELIMITER '|', FORMAT text, NULL '')"< <(grep -v '^#' "$fas")
+$db -c "DROP TABLE IF EXISTS as2org;" >/dev/null
+$db -c "CREATE TABLE as2org
+    AS (
+        SELECT asf.aut, asf.autname, orgf.orgname, asf.orgid, orgf.country
+        FROM asfields AS asf
+        JOIN orgfields AS orgf
+        ON asf.orgId = orgf.orgid
+    );"

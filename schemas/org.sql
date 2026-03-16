@@ -1,4 +1,4 @@
-CREATE TABLE :tbl (
+CREATE TABLE orgFields (
     orgId          text 
                    PRIMARY KEY,         -- unique ID for the given organization
     dateChanged    date,                -- the changed date provided by WHOIS

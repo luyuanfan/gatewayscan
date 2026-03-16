@@ -1,7 +1,5 @@
 SELECT * FROM routerips WHERE deleted = false AND entropy >= 0.5 LIMIT 100;
 
--- do a unique v.s. all percentage (for all those ones with high enough entropy scores)
-
 -- order each repeated host id by both times repeated AND entropy score
 SELECT hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
     FROM routerips
