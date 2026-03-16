@@ -4,7 +4,7 @@ CSV="data/small.csv"
 TBL="smallRouterIPs"
 DB="psql -h localhost -p 6789"
 echo "creating table $TBL"
-$DB -v tbl=$TBL -f psql/routerips-schema.sql
+$DB -v tbl=$TBL -f schemas/routerips.sql
 echo "copying file to table"
 $DB -c "\COPY $TBL (Protocol, TgtIP, SrcIP, HopLim, ICMPv6Type, ICMPv6Code, RTT) FROM STDIN WITH (FORMAT csv)"< <(grep '^icmp,' "$CSV")
 echo "adding subnet prefix length to table"

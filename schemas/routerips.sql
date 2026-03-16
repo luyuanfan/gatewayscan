@@ -5,6 +5,7 @@ CREATE TABLE :tbl (
     SrcIP            inet,
     SubnetPfx        cidr,
     PfxLen           smallint,
+    NetID            cidr,
     Entropy          real,
     HostID           text,
     HopLim           smallint,
