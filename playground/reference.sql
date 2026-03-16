@@ -37,15 +37,13 @@ UPDATE routerips
         NetID = set_masklen(SrcIP, 64)::cidr
     WHERE Deleted = false;
 
--- creating index on columns: (netid, hostid)
-CREATE INDEX ON routerips (netid, hostid);
-
 -- filtering out the repeated replies and only keep one instance
 UPDATE routerips
-    SET deleted = true
-    WHERE deleted = false
+    SET Deleted = true
+    WHERE Deleted = false
         AND ctid NOT IN (
             SELECT MIN(ctid) FROM routerips
-            WHERE deleted = false
-            GROUP BY netid, hostid
+            WHERE Deleted = false
+            GROUP BY SrcIP
+            HAVING COUNT(SrcIP) > 1
         );

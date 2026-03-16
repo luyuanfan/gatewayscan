@@ -10,14 +10,12 @@ SELECT hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
 	HAVING COUNT(*) > 1
     ORDER BY entropy_score DESC, host_id_count DESC;
 
--- TODO: it's also possible that multiple different probes trigger the same router to respond
---       so i can filter out those repeated replies coming from the exact same netid
-SELECT subnetpfx, netid, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
+SELECT subnetpfx, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
     FROM routerips
     WHERE deleted = false AND entropy >= 0.5
-    GROUP BY subnetpfx, netid, hostid
+    GROUP BY subnetpfx, hostid
 	HAVING COUNT(hostid) > 1
-    ORDER BY subnetpfx, entropy_score DESC, host_id_count DESC;
+    ORDER BY entropy_score DESC, host_id_count DESC;
 
 -- TODO: for each repeated host id, we want to see which subnets they come from
 -- might need to keep a targeted subnet field and also a full network portion field

@@ -25,15 +25,13 @@ UPDATE :tbl
         NetID = set_masklen(SrcIP, 64)::cidr
     WHERE Deleted = false;
 
-\echo 'creating index on columns: (netid, hostid)'
-CREATE INDEX ON :tbl (netid, hostid);
-
 \echo 'filtering out the repeated replies and only keep one instance'
 UPDATE :tbl
-    SET deleted = true
-    WHERE deleted = false
+    SET Deleted = true
+    WHERE Deleted = false
         AND ctid NOT IN (
             SELECT MIN(ctid) FROM :tbl
-            WHERE deleted = false
-            GROUP BY netid, hostid
+            WHERE Deleted = false
+            GROUP BY SrcIP
+            HAVING COUNT(SrcIP) > 1
         );
