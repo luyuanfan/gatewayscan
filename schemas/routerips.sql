@@ -12,5 +12,5 @@ CREATE TABLE :tbl (
     NetID            cidr,
     SubnetPfx        cidr,
     PfxLen           smallint,
-    Deleted          boolean DEFAULT false
+    Deleted          boolean
 );
