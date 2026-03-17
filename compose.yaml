@@ -10,13 +10,13 @@ services:
       dockerfile: Dockerfile
     ports:
       - 6789:5432
-    # restart: always
+    restart: always
     # set shared memory limit when using docker compose
     # shm_size: 128mb
     # or set shared memory limit when deploy via swarm stack
     volumes:
      - type: bind
-       source: /mnt/usb/
+       source: /dbdata/
        target: /dbdata/
     environment:
       POSTGRES_USER: lyspfan
@@ -31,6 +31,7 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: gateway-pgadmin
+    restart: always
     environment:
       PGADMIN_DEFAULT_EMAIL: lyspfan@gmail.com 
       PGADMIN_DEFAULT_PASSWORD: lyspfan
@@ -43,6 +44,6 @@ services:
   adminer:
     image: adminer
     container_name: gateway-adminer
-    # restart: always
+    restart: always
     ports:
       - 8080:8080

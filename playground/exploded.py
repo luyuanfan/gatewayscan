@@ -2,6 +2,10 @@ import ipaddress
 
 def main():
     ip_txt = "2607:5300:5432:abcd::25b5"
+    slaac_addr = "2001:db8:1:1:0a00:27ff:fe4e:66a2"
+    hostid = ipaddress.IPv6Address(slaac_addr).exploded.replace(':', '')[16:]
+    print(hostid)
+    print(hostid[6:10])
     ip_obj = ipaddress.IPv6Address(ip_txt)
     print(f"{type(ip_obj)}")
     full = ip_obj.exploded.replace(":", "")

@@ -40,5 +40,5 @@ DROP TABLE IF EXISTS clean_routerips;
 
 \echo 'creating table clean_routerips with entries that survived and with entropy > 0.5'
 CREATE TABLE clean_routerips AS
-SELECT * FROM routerips
+SELECT * FROM :tbl
     WHERE deleted = false AND entropy > 0.5;

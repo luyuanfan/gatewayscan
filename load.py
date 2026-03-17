@@ -1,8 +1,3 @@
-# chunk the file
-# use python script that parallel process it: determine whether delete or keep
-# move the kept lines in the table
-# not sure how to move to table yet
-
 import io
 import os
 import sys
@@ -18,7 +13,6 @@ import multiprocessing as mp
 from collections import Counter
 from sqlalchemy import create_engine
 
-nproc = 30
 data_dir='/dbdata/'
 tablename='test2'
 
@@ -82,9 +76,11 @@ def main():
     # and i don't need to deal with work assignment?
     # TODO: also must remove the first few lines (the comments out)
 
-    pool = mp.Pool(nproc)
-
     for filepath in sys.argv[1:]:
+        # might want to decide the number of worker depending on 
+        nproc = 30
+        pool = mp.Pool(nproc)
+
         start = time.time()
         print(f'Started processing {filepath}')
 
@@ -107,11 +103,11 @@ def main():
         conn.commit()
         end = time.time()
         os.system(f'rm -rf {data_dir}/*')
+        pool.close()
 
     print(f'Finished [{filepath}] in {end - start:.2f}s')
     cur.close()
     conn.close()
-    pool.close()
 
 if __name__ == "__main__":
     main()
