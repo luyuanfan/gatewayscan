@@ -1,63 +1,41 @@
-SELECT * FROM routerips WHERE deleted = false AND entropy >= 0.5 LIMIT 100;
-
--- order each repeated host id by both times repeated AND entropy score
+-- order each repeated host id by entropy score AND times repeated
 SELECT hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
-    FROM routerips
-    WHERE deleted = false AND entropy >= 0.5
+FROM clean_routerips
+GROUP BY hostid
+HAVING COUNT(hostid) > 1
+ORDER BY entropy_score DESC, host_id_count DESC;
+
+-- get those hostids that are mapped to more than one netids
+SELECT hostid, netid, subnetpfx, entropy
+FROM clean_routerips
+WHERE entropy > 0.8 AND
+    hostid IN (
+    SELECT hostid FROM clean_routerips
     GROUP BY hostid
-	HAVING COUNT(*) > 1
-    ORDER BY entropy_score DESC, host_id_count DESC;
+    HAVING COUNT(netid) > 1
+)
+ORDER BY hostid, netid;
 
-SELECT subnetpfx, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
-    FROM routerips
-    WHERE deleted = false AND entropy >= 0.5
-    GROUP BY subnetpfx, hostid
-	HAVING COUNT(hostid) > 1
-    ORDER BY entropy_score DESC, host_id_count DESC;
-
--- TODO: for each repeated host id, we want to see which subnets they come from
--- might need to keep a targeted subnet field and also a full network portion field
-SELECT subnetpfx, netid, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
-    FROM routerips
-    WHERE deleted = false AND entropy >= 0.5
-    GROUP BY subnetpfx, netid, hostid
-	HAVING COUNT(hostid) > 1
-    ORDER BY subnetpfx, entropy_score DESC, host_id_count DESC;
-
--- order data the same way as above but also print which subnet it comes from
-
--- save the subnets as a table just in case that the prefix does not match any ASN
-CREATE TABLE markedSubnets
-    AS (
-        SELECT subnetpfx, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
-        FROM routerips
-        WHERE deleted = false AND entropy >= 0.5
-        GROUP BY subnetpfx, hostid
-        HAVING COUNT(*) > 1
-        ORDER BY entropy_score DESC, host_id_count DESC
-    );
+-- get the list of netids and subnet prefixes where these repeated addresses occur
+CREATE TABLE markedsubnets AS (
+    SELECT hostid, netid, subnetpfx, entropy
+    FROM clean_routerips
+    WHERE entropy > 0.8 AND
+        hostid IN (
+        SELECT hostid FROM clean_routerips
+        GROUP BY hostid
+        HAVING COUNT(netid) > 1
+    )
+    ORDER BY hostid, netid
+);
 
 -- map subnet to AS numbers 
-SELECT prefix, asn, hostid, host_id_count, entropy_score FROM pfx2as JOIN (
-    SELECT subnetpfx, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
-    FROM routerips
-    WHERE deleted = false AND entropy >= 0.5
-    GROUP BY subnetpfx, hostid
-	HAVING COUNT(*) > 1
-    ORDER BY entropy_score DESC, host_id_count DESC
-) ON prefix = subnetpfx;
+SELECT m.hostid, m.subnetpfx, p.prefix, p.asn
+    FROM markedsubnets m
+    JOIN pfx2as p ON p.prefix >>= m.subnetpfx;
 
-
--- map above to organization
-SELECT sub.subnetpfx, sub.hostid, sub.host_id_count, sub.entropy_score,
-       p1.asn, p2.autname, p2.orgname, p2.country
-FROM (
-    SELECT subnetpfx, hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
-    FROM routerips
-    WHERE deleted = false AND entropy >= 0.5
-    GROUP BY subnetpfx, hostid
-	HAVING COUNT(*) > 1
-    ORDER BY entropy_score DESC, host_id_count DESC
-) AS sub
-JOIN pfx2as AS p1 ON sub.subnetpfx <<= p1.prefix::cidr
-JOIN as2org AS p2 ON p1.asn = p2.aut;
+-- map these asn to organizations
+SELECT m.hostid, m.subnetpfx, m.netid, m.entropy, p.prefix, p.asn, a.autname, a.orgid, a.orgname, a.country
+FROM markedsubnets m
+JOIN pfx2as p ON p.prefix >>= m.subnetpfx
+JOIN as2org a ON a.aut = p.asn;
