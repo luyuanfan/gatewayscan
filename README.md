@@ -11,7 +11,7 @@ Start services:
 docker compose up
 ```
 
-Connect to PSQL in terminal:
+Connect to PSQL from terminal:
 ```bash
 psql -h localhost -p 6789 -U lyspfan
 ```
@@ -37,11 +37,16 @@ File locations:
 - `pfx2as`, `asfields`, `orgfields` processing queries are in `./psql/pfx2as2org.sql`
 - `./playground/` holds test files
 
-## Import files
+## Import functions and files
 
-Import CSV files (take `medium.csv` as example)
+Add all functions
 ```bash
-./import/medium.sh
+./import/functions.sh
+```
+
+Import test CSV file (take `medium.csv` as example)
+```bash
+./import/test.sh
 ```
 
 Import compressed CSV files
@@ -60,7 +65,7 @@ Import CAIDA's as2org dataset
 ```bash
 ./import/as2org.sh
 ```
-
+chunk 
 ## Process database
 
 TODO
