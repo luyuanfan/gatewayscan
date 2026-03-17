@@ -1,5 +1,5 @@
-DROP TABLE IF EXISTS routerips;
-CREATE TABLE routerips (
+DROP TABLE IF EXISTS test;
+CREATE TABLE test (
     Protocol         text,
     TgtIP            inet,
     SrcIP            inet,
@@ -15,35 +15,45 @@ CREATE TABLE routerips (
     Deleted          boolean DEFAULT false
 );
 
--- removing replies from aliased networks and v4 routers addresses
-UPDATE routerips
-    SET Deleted = true
-    WHERE TgtIP = SrcIP OR family(SrcIP) = 4;
+\echo 'creating index on column: deleted'
+CREATE INDEX ON test (deleted);
 
--- expanding the rest of the router addresses
-UPDATE routerips
-    SET HostID = right(encode(substring(inet_send(SrcIP) from 5), 'hex'), 16)
-    WHERE Deleted = false;
+\echo 'removing replies from aliased networks and v4 routers addresses'
+UPDATE test
+SET Deleted = true
+WHERE TgtIP = SrcIP OR family(SrcIP) = 4;
 
--- removing SLAAC generated addresses
-UPDATE routerips
-    SET Deleted = true
-    WHERE substring(HostID from 7 for 4) = 'fffe' AND Deleted = false;
+\echo 'expanding the rest of the router addresses'
+UPDATE test
+SET HostID = right(encode(substring(inet_send(SrcIP) from 5), 'hex'), 16)
+WHERE Deleted = false;
 
--- getting subnet prefix, network id, and calculating entropy score on host id
-UPDATE routerips
-    SET Entropy = entropy_hex(HostID),
-        SubnetPfx = set_masklen(SrcIP, PfxLen)::cidr,
-        NetID = set_masklen(SrcIP, 64)::cidr
-    WHERE Deleted = false;
+\echo 'removing SLAAC generated addresses'
+UPDATE test
+SET Deleted = true
+WHERE Deleted = false AND substring(HostID from 7 for 4) = 'fffe';
 
--- filtering out the repeated replies and only keep one instance
-UPDATE routerips
-    SET Deleted = true
-    WHERE Deleted = false
-        AND ctid NOT IN (
-            SELECT MIN(ctid) FROM routerips
-            WHERE Deleted = false
-            GROUP BY SrcIP
-            HAVING COUNT(SrcIP) > 1
-        );
+\echo 'getting subnet prefix, network id, and calculating entropy score on host id'
+UPDATE test
+SET Entropy = entropy_hex(HostID),
+    SubnetPfx = set_masklen(SrcIP, PfxLen)::cidr,
+    NetID = set_masklen(SrcIP, 64)::cidr
+WHERE Deleted = false;
+
+\echo 'filtering out the repeated replies and only keep one instance'
+UPDATE test
+SET Deleted = true
+WHERE Deleted = false
+    AND ctid NOT IN (
+        SELECT MIN(ctid) FROM test
+        WHERE Deleted = false
+        GROUP BY SrcIP
+        HAVING COUNT(SrcIP) > 1
+    );
+
+DROP TABLE IF EXISTS clean_test;
+
+\echo 'creating table clean_test with entries that survived and with entropy > 0.5'
+CREATE TABLE clean_test AS
+SELECT * FROM test
+    WHERE deleted = false AND entropy > 0.5;
