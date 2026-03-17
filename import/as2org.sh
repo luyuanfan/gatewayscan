@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 db="psql -h localhost -p 6789"
 
 location='https://data.caida.org/datasets/as-organizations/20250801.as-org2info.txt.gz'

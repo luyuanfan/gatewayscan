@@ -1,11 +1,11 @@
--- order each repeated host id by entropy score AND times repeated
+\echo 'order each repeated host id by entropy score AND times repeated'
 SELECT hostid, COUNT(*) AS host_id_count, MAX(entropy) AS entropy_score
 FROM clean_routerips
 GROUP BY hostid
 HAVING COUNT(hostid) > 1
 ORDER BY entropy_score DESC, host_id_count DESC;
 
--- get those hostids that are mapped to more than one netids
+\echo 'get those hostids that are mapped to more than one netids'
 SELECT hostid, netid, subnetpfx, entropy
 FROM clean_routerips
 WHERE entropy > 0.8 AND
@@ -16,7 +16,7 @@ WHERE entropy > 0.8 AND
 )
 ORDER BY hostid, netid;
 
--- get the list of netids and subnet prefixes where these repeated addresses occur
+\echo 'get the list of netids and subnet prefixes where these repeated addresses occur'
 CREATE TABLE markedsubnets AS (
     SELECT hostid, netid, subnetpfx, entropy
     FROM clean_routerips
@@ -29,12 +29,12 @@ CREATE TABLE markedsubnets AS (
     ORDER BY hostid, netid
 );
 
--- map subnet to AS numbers 
+\echo 'map subnet to AS numbers'
 SELECT m.hostid, m.subnetpfx, p.prefix, p.asn
-    FROM markedsubnets m
-    JOIN pfx2as p ON p.prefix >>= m.subnetpfx;
+FROM markedsubnets m
+JOIN pfx2as p ON p.prefix >>= m.subnetpfx;
 
--- map these asn to organizations
+\echo 'map these asn to organizations'
 SELECT m.hostid, m.subnetpfx, m.netid, m.entropy, p.prefix, p.asn, a.autname, a.orgid, a.orgname, a.country
 FROM markedsubnets m
 JOIN pfx2as p ON p.prefix >>= m.subnetpfx

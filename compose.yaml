@@ -5,7 +5,7 @@ services:
 
   router-ip:
     image: router-ip
-    container_name: routerips-db
+    container_name: gateway-db
     build:
       dockerfile: Dockerfile
     ports:
@@ -30,7 +30,7 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: pgadmin
+    container_name: gateway-pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: lyspfan@gmail.com 
       PGADMIN_DEFAULT_PASSWORD: lyspfan
@@ -42,7 +42,7 @@ services:
 
   adminer:
     image: adminer
-    container_name: routerips-adminer
+    container_name: gateway-adminer
     # restart: always
     ports:
       - 8080:8080

@@ -1,7 +1,7 @@
 #!/bin/bash
-
+set -e
 CSV="data/medium.csv"
-TBL="routerIPs"
+TBL="test"
 DB="psql -h localhost -p 6789"
 echo "creating table $TBL"
 $DB -v tbl=$TBL -f schemas/routerips.sql

@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e
 DB="psql -h localhost -p 6789"
 TBL="routerIPs"
 echo "creating table $TBL"

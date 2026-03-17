@@ -1,6 +1,6 @@
 #!/bin/bash
+set -e
 db="psql -h localhost -p 6789"
-
 location='https://publicdata.caida.org/datasets/routing/routeviews6-prefix2as/2025/07/routeviews-rv6-20250730-0600.pfx2as.gz'
 fname=data/${location##*/}
 csv=${fname%%.gz*}
