@@ -38,7 +38,7 @@ UPDATE :tbl
 
 DROP TABLE IF EXISTS clean_routerips;
 
-/echo ''
+/echo 'creating table clean_routerips with entries that survived'
 CREATE TABLE clean_routerips AS
 SELECT * FROM routerips
-    WHERE deleted = false;
+    WHERE deleted = false AND entropy > 0.5;
