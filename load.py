@@ -1,5 +1,5 @@
-import io
 import os
+import io
 import sys
 import bz2
 import csv
@@ -9,12 +9,14 @@ import ipaddress
 import pandas as pd
 from math import log2
 import multiprocessing as mp
+from datetime import datetime
 from collections import Counter
 from sqlalchemy import create_engine
 
 tmp_data_dir='/dbdata'
 tablename='test2'
 nproc=40
+nchunk=60
 dbcommand="psql -h localhost -p 6789"
 db_url='postgresql+psycopg2://lyspfan:lyspfan@localhost:6789/lyspfan'
 
@@ -82,12 +84,12 @@ def main():
     print(f"Target files: {pathlist}")
 
     os.system(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql')
-    output = io.StringIO()
-    start = time.time()
-    print(f'Started timing at {start}')
 
     for filepath in pathlist:
         print(f"Processing file: {filepath}")
+        now = datetime.now()
+        start = time.time()
+        print(f'Started timing at {now}')
         if not filepath.endswith('.csv'):
             continue
 
@@ -104,23 +106,24 @@ def main():
             sys.exit(1)
 
         pool = mp.Pool(nproc)
-
-        print(f"Splitting file {filepath} in {nproc} chunks and placed them in {tmp_data_dir}")
-        os.system(f'split --number=l/{nproc} --additional-suffix=.csv {outpath} {tmp_data_dir}/chunk_')
-        
-        wrs = []
-        for chunk in os.listdir(tmp_data_dir):
-            if not chunk.startswith('chunk_'):
-                continue
-            wr = pool.apply_async(checknload, (os.path.join(tmp_data_dir, chunk), pfxlen, db_url))
-            wrs.append(wr)
-        [wr.get() for wr in wrs]
-        end_filter = time.time()
-        print(f'Finished filtering and loading entries for {filepath} in {end_filter - start:.2f}s')
-        print(f'Removing temporary files in {tmp_data_dir}')
-        os.system(f'rm -rf {tmp_data_dir}/chunk_*')
-        pool.close()
-        pool.join()
+        try:
+            print(f"Splitting file {filepath} in {nchunk} chunks and placed them in {tmp_data_dir}")
+            os.system(f'split --number=l/{nchunk} --additional-suffix=.csv {outpath} {tmp_data_dir}/chunk_')
+            
+            wrs = []
+            for chunk in os.listdir(tmp_data_dir):
+                if not chunk.startswith('chunk_'):
+                    continue
+                wr = pool.apply_async(checknload, (os.path.join(tmp_data_dir, chunk), pfxlen, db_url))
+                wrs.append(wr)
+            [wr.get() for wr in wrs]
+            end_filter = time.time()
+            print(f'Finished filtering and loading entries for {filepath} in {end_filter - start:.2f}s')
+        finally:
+            print(f'Removing temporary files in {tmp_data_dir}')
+            os.system(f'rm -rf {tmp_data_dir}/chunk_*')
+            pool.close()
+            pool.join()
 
 if __name__ == "__main__":
     main()
