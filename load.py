@@ -16,6 +16,7 @@ tmp_data_dir='/dbdata'
 tablename='test2'
 nproc=40
 dbcommand="psql -h localhost -p 6789"
+db_url='postgresql+psycopg2://lyspfan:lyspfan@localhost:6789/lyspfan'
 
 def entropy_hex(hid):
     c = Counter(hid)
@@ -46,11 +47,23 @@ def process_row(row, pfxlen):
         'deleted':     False
     }
 
-def check(chunk, pfxlen):
+def checknload(chunk, pfxlen, db_url):
     colnames = ['protocol', 'tgtip', 'srcip', 'hoplim', 'icmpv6type', 'icmpv6code', 'rtt']
     df = pd.read_csv(chunk, names=colnames, header=None, comment='#')
     results = df.apply(process_row, args=(pfxlen, ), axis=1)
-    return pd.DataFrame([r for r in results if r is not None])
+    df_out =pd.DataFrame([r for r in results if r is not None])
+    if df_out.empty: return
+
+    engine = create_engine(db_url)
+    conn = engine.raw_connection()
+    cur = conn.cursor()
+    output = io.StringIO()
+    df_out.to_csv(output, sep=',', header=False, index=False)
+    output.seek(0)
+    cur.copy_expert(f"COPY {tablename} FROM STDIN WITH (FORMAT csv, NULL '')", output)
+    conn.commit()
+    cur.close()
+    conn.close()
 
 def main():
     if len(sys.argv) < 2:
@@ -68,9 +81,6 @@ def main():
         load_all = True
     print(f"Target files: {pathlist}")
 
-    engine = create_engine('postgresql+psycopg2://lyspfan:lyspfan@localhost:6789/lyspfan')
-    conn = engine.raw_connection()
-    cur = conn.cursor()
     os.system(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql')
     output = io.StringIO()
     start = time.time()
@@ -102,26 +112,15 @@ def main():
         for chunk in os.listdir(tmp_data_dir):
             if not chunk.startswith('chunk_'):
                 continue
-            wr = pool.apply_async(check, (os.path.join(tmp_data_dir, chunk), pfxlen, ))
+            wr = pool.apply_async(checknload, (os.path.join(tmp_data_dir, chunk), pfxlen, db_url))
             wrs.append(wr)
+        [wr.get() for wr in wrs]
         end_filter = time.time()
-        print(f'Finished filtering entries for {filepath} in {end_filter - start:.2f}s')
-        dfs = [wr.get() for wr in wrs]
-        df = pd.concat(dfs, ignore_index=True)
-        output = io.StringIO()
-        df.to_csv(output, sep=',', header=False, index=False)
-        output.seek(0)
-        cur.copy_expert(f"COPY {tablename} FROM STDIN WITH (FORMAT csv, NULL '')", output)
-        conn.commit()
-        end_copy = time.time()
-        print(f'Finished copying {filepath} in {end_copy - start:.2f}s')
+        print(f'Finished filtering and loading entries for {filepath} in {end_filter - start:.2f}s')
         print(f'Removing temporary files in {tmp_data_dir}')
         os.system(f'rm -rf {tmp_data_dir}/chunk_*')
         pool.close()
         pool.join()
-
-    cur.close()
-    conn.close()
 
 if __name__ == "__main__":
     main()
