@@ -37,9 +37,15 @@ Import test files
 ```bash
 python3 load.py testfile1.csv testfile2.csv ...
 ```
+Decompress:
+```bash
+pbzip2 -dckf -p4 /mnt/usb/combined-48s-r1-s56.csv.bz2 > /dbdata/combined-48s-r1-s56.csv
+pbzip2 -dckf -p4 /mnt/usb/combined-48s-r2-s60.csv.bz2 > /dbdata/combined-48s-r2-s60.csv
+pbzip2 -dckf -p4 /mnt/usb/combined-48s-r3-s64.csv.bz2 > /dbdata/combined-48s-r3-s64.csv
+```
+
 Import all the files
 ```bash
-nohup ./decompress.sh &
 python3 load.py --full
 ```
 
