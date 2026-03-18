@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 
 tmp_data_dir='/dbdata'
 tablename='test2'
-nproc=30
+nproc=40
 dbcommand="psql -h localhost -p 6789"
 
 def entropy_hex(hid):
@@ -59,40 +59,43 @@ def main():
         sys.exit(1)
     if ("--full" not in sys.argv[1:]):
         print('Using test mode')
-        pathlist = [os.path.basename(p) for p in sys.argv[1:]]
+        pathlist = sys.argv[1:]
         load_all = False
     else:
         print('Using full mode')
         pathlist = os.listdir(tmp_data_dir)
+        print(pathlist)
         load_all = True
+    print(f"Target files: {pathlist}")
 
     engine = create_engine('postgresql+psycopg2://lyspfan:lyspfan@localhost:6789/lyspfan')
     conn = engine.raw_connection()
     cur = conn.cursor()
-    # os.system(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql')
-    print(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql')
+    os.system(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql')
     output = io.StringIO()
     start = time.time()
-    print(pathlist)
+    print(f'Started timing at {start}')
 
     for filepath in pathlist:
-        print(f"file path {filepath}")
+        print(f"Processing file: {filepath}")
         if not filepath.endswith('.csv'):
             continue
-        outpath = os.path.join(tmp_data_dir, filepath)
+
+        if load_all:
+            pfxlen = filepath.removesuffix('.csv')[-2:]
+            outpath = os.path.join(tmp_data_dir, filepath)
+        else:
+            pfxlen = 56
+            outpath = filepath
+        print(f"Setting prefix length of file {filepath} to {pfxlen}")
+        
         if not os.path.exists(outpath):
             print(f'{outpath} not found, please double check the name')
             sys.exit(1)
-        
-        if load_all:
-            pfxlen = filepath.removesuffix('.csv')[-2:]
-            print(filepath)
-        else:
-            pfxlen = 56
 
         pool = mp.Pool(nproc)
-        print(f'Started processing {filepath}')
-        print(f'split --number=l/{nproc} --additional-suffix=.csv {outpath} {tmp_data_dir}/chunk_')
+
+        print(f"Splitting file {filepath} in {nproc} chunks and placed them in {tmp_data_dir}")
         os.system(f'split --number=l/{nproc} --additional-suffix=.csv {outpath} {tmp_data_dir}/chunk_')
         
         wrs = []
@@ -101,21 +104,22 @@ def main():
                 continue
             wr = pool.apply_async(check, (os.path.join(tmp_data_dir, chunk), pfxlen, ))
             wrs.append(wr)
-
+        end_filter = time.time()
+        print(f'Finished filtering entries for {filepath} in {end_filter - start:.2f}s')
         dfs = [wr.get() for wr in wrs]
         df = pd.concat(dfs, ignore_index=True)
-        print(f'Finished loading [{filepath}] in {time.time() - start:.2f}s')
         output = io.StringIO()
         df.to_csv(output, sep=',', header=False, index=False)
         output.seek(0)
         cur.copy_expert(f"COPY {tablename} FROM STDIN WITH (FORMAT csv, NULL '')", output)
         conn.commit()
+        end_copy = time.time()
+        print(f'Finished copying {filepath} in {end_copy - start:.2f}s')
+        print(f'Removing temporary files in {tmp_data_dir}')
         os.system(f'rm -rf {tmp_data_dir}/chunk_*')
         pool.close()
         pool.join()
 
-    end = time.time()
-    print(f'Finished [{filepath}] in {end - start:.2f}s')
     cur.close()
     conn.close()
 
