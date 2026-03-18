@@ -12,7 +12,6 @@ import multiprocessing as mp
 from collections import Counter
 from sqlalchemy import create_engine
 
-source_data_dir='/mnt/usb'
 tmp_data_dir='/dbdata'
 tablename='test2'
 nproc=30
@@ -60,46 +59,46 @@ def main():
         sys.exit(1)
     if ("--full" not in sys.argv[1:]):
         print('Using test mode')
-        pathlist = sys.argv[1:]
+        pathlist = [os.path.basename(p) for p in sys.argv[1:]]
         load_all = False
     else:
         print('Using full mode')
-        pathlist = os.listdir(source_data_dir)
+        pathlist = os.listdir(tmp_data_dir)
         load_all = True
 
     engine = create_engine('postgresql+psycopg2://lyspfan:lyspfan@localhost:6789/lyspfan')
     conn = engine.raw_connection()
     cur = conn.cursor()
-    os.system(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql')
+    # os.system(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql')
+    print(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql')
     output = io.StringIO()
-    
+    start = time.time()
+    print(pathlist)
+
     for filepath in pathlist:
+        print(f"file path {filepath}")
+        if not filepath.endswith('.csv'):
+            continue
+        outpath = os.path.join(tmp_data_dir, filepath)
+        if not os.path.exists(outpath):
+            print(f'{outpath} not found, please double check the name')
+            sys.exit(1)
+        
         if load_all:
-            if not (filepath.endswith('.csv.bz2') or filepath.endswith('.csv')):
-                continue
-            full_src = os.path.join(source_data_dir, filepath)
-            if not os.path.exists(full_src):
-                print(f'{full_src} not found, please check the name')
-                sys.exit(1)
-            outfilename = filepath.removesuffix('.bz2')
-            outpath = os.path.join(tmp_data_dir, outfilename)
-            # os.system(f'pbzip2 -dcfk -p{nproc} {full_src} > {outpath}')
-            print(f'pbzip2 -dcfk -p{nproc} {full_src} > {outpath}')
-            pfxlen = (filepath.removesuffix(".csv.bz2"))[-2:]
+            pfxlen = filepath.removesuffix('.csv')[-2:]
+            print(filepath)
         else:
-            outfilename = os.path.basename(filepath)
-            outpath = os.path.join(tmp_data_dir, outfilename)
             pfxlen = 56
 
         pool = mp.Pool(nproc)
-        start = time.time()
-        print(f'Started processing {outfilename}')
-        os.system(f'split {filepath} --number=l/{nproc} --additional-suffix=.csv {tmp_data_dir}chunk_')
-        # print(f'split {outpath} --number=l/{nproc} --additional-suffix=.csv {tmp_data_dir}chunk_')
-        os.remove(outpath)
+        print(f'Started processing {filepath}')
+        print(f'split --number=l/{nproc} --additional-suffix=.csv {outpath} {tmp_data_dir}/chunk_')
+        os.system(f'split --number=l/{nproc} --additional-suffix=.csv {outpath} {tmp_data_dir}/chunk_')
         
         wrs = []
         for chunk in os.listdir(tmp_data_dir):
+            if not chunk.startswith('chunk_'):
+                continue
             wr = pool.apply_async(check, (os.path.join(tmp_data_dir, chunk), pfxlen, ))
             wrs.append(wr)
 
@@ -111,7 +110,7 @@ def main():
         output.seek(0)
         cur.copy_expert(f"COPY {tablename} FROM STDIN WITH (FORMAT csv, NULL '')", output)
         conn.commit()
-        os.system(f'rm -rf {tmp_data_dir}/*')
+        os.system(f'rm -rf {tmp_data_dir}/chunk_*')
         pool.close()
         pool.join()
 
