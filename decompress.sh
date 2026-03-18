@@ -1,14 +1,17 @@
 #!/bin/bash
+set -e 
+source_dir="/mnt/usb"
+tmp_dir="/dbdata"
 
-source_dir='/mnt/usb'
-tmp_dir='/dbdata'
-
-mkdir -p "$tmp_dir"c
-
-for f in "$source_dir"/*.csv.bz2; do
-    filename=$(basename "$f" .bz2)
-    echo "Decompressing $f to $tmp_dir/$filename"
-    pbzip2 -dckf -p30 "$f" > "$tmp_dir/$filename"
+for filename in `ls $source_dir`; do
+    suffix="${filename#*.}"
+    if [ $suffix != "csv.bz2" ]; then
+        continue
+    fi
+    decompressed="${filename%.*}"
+    echo "Decompressing $source_dir/$filename to $tmp_dir/$decompressed"
+    pbzip2 -dckf -p4 "$source_dir/$filename" > "$tmp_dir/$decompressed"
+    echo "Done decompressing $source_dir/$filename"
 done
 
-echo "Done decompressing"
+echo "Done decompressing everything"
