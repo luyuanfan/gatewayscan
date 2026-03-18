@@ -13,9 +13,10 @@ from collections import Counter
 from sqlalchemy import create_engine
 
 source_data_dir='/mnt/usb'
+tmp_data_dir='/dbdata'
 tablename='test2'
-data_dir='/dbdata/'
-nproc = 30
+nproc=30
+dbcommand="psql -h localhost -p 6789"
 
 def entropy_hex(hid):
     c = Counter(hid)
@@ -47,11 +48,8 @@ def process_row(row, pfxlen):
     }
 
 def check(chunk, pfxlen):
-    # while chunk.readline().startswith('#'):
-
-
     colnames = ['protocol', 'tgtip', 'srcip', 'hoplim', 'icmpv6type', 'icmpv6code', 'rtt']
-    df = pd.read_csv(chunk, names=colnames, header=None)
+    df = pd.read_csv(chunk, names=colnames, header=None, comment='#')
     results = df.apply(process_row, args=(pfxlen, ), axis=1)
     return pd.DataFrame([r for r in results if r is not None])
 
@@ -69,39 +67,40 @@ def main():
         pathlist = os.listdir(source_data_dir)
         load_all = True
 
-    # os.system(f"mkdir -p {data_dir}")
-    # os.system(f"chmod a+w+r {data_dir}")
-    # TODO: should create the database from making the schema
     engine = create_engine('postgresql+psycopg2://lyspfan:lyspfan@localhost:6789/lyspfan')
     conn = engine.raw_connection()
     cur = conn.cursor()
+    os.system(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql')
     output = io.StringIO()
-
-    # TODO: also must remove the first few lines (the comments out)!!!!!!!!!!! VERY IMPORYTTANT
+    
     for filepath in pathlist:
         if load_all:
-            if not os.path.exists(os.path.join(source_data_dir, filepath)):
-                print(f'{filepath} not found, please check the name')
-                sys.exit(1)
             if not (filepath.endswith('.csv.bz2') or filepath.endswith('.csv')):
-                print(f'skipping file {filepath}')
                 continue
-            outfilename = filepath.removesuffix('.bz2').removeprefix(f'{source_data_dir}')
-            os.system(f'pbzip2 -dfk -p30 {os.path.join(source_data_dir, filepath)} > {os.path.join(data_dir, outfilename)}')
+            full_src = os.path.join(source_data_dir, filepath)
+            if not os.path.exists(full_src):
+                print(f'{full_src} not found, please check the name')
+                sys.exit(1)
+            outfilename = filepath.removesuffix('.bz2')
+            outpath = os.path.join(tmp_data_dir, outfilename)
+            # os.system(f'pbzip2 -dcfk -p{nproc} {full_src} > {outpath}')
+            print(f'pbzip2 -dcfk -p{nproc} {full_src} > {outpath}')
             pfxlen = (filepath.removesuffix(".csv.bz2"))[-2:]
         else:
-            outfilename = os.path.join(data_dir, filepath)
+            outfilename = os.path.basename(filepath)
+            outpath = os.path.join(tmp_data_dir, outfilename)
             pfxlen = 56
 
         pool = mp.Pool(nproc)
-
         start = time.time()
-        print(f'Started processing {filepath}')
-        os.system(f'split {filepath} --number=l/{nproc} --additional-suffix=.csv {data_dir}')
+        print(f'Started processing {outfilename}')
+        os.system(f'split {filepath} --number=l/{nproc} --additional-suffix=.csv {tmp_data_dir}chunk_')
+        # print(f'split {outpath} --number=l/{nproc} --additional-suffix=.csv {tmp_data_dir}chunk_')
+        os.remove(outpath)
         
         wrs = []
-        for chunk in os.listdir(data_dir):
-            wr = pool.apply_async(check, (os.path.join(data_dir, chunk), pfxlen, ))
+        for chunk in os.listdir(tmp_data_dir):
+            wr = pool.apply_async(check, (os.path.join(tmp_data_dir, chunk), pfxlen, ))
             wrs.append(wr)
 
         dfs = [wr.get() for wr in wrs]
@@ -112,10 +111,11 @@ def main():
         output.seek(0)
         cur.copy_expert(f"COPY {tablename} FROM STDIN WITH (FORMAT csv, NULL '')", output)
         conn.commit()
-        end = time.time()
-        os.system(f'rm -rf {data_dir}/*')
+        os.system(f'rm -rf {tmp_data_dir}/*')
         pool.close()
+        pool.join()
 
+    end = time.time()
     print(f'Finished [{filepath}] in {end - start:.2f}s')
     cur.close()
     conn.close()
