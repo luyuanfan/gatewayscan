@@ -54,6 +54,7 @@ def checknload(chunk, pfxlen, db_url):
     df = pd.read_csv(chunk, names=colnames, header=None, comment='#')
     results = df.apply(process_row, args=(pfxlen, ), axis=1)
     df_out =pd.DataFrame([r for r in results if r is not None])
+    df_out = df_out.drop_duplicates(subset=['srcip'], keep='first')
     if df_out.empty: return
 
     engine = create_engine(db_url)

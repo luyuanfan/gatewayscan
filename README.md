@@ -31,27 +31,16 @@ DB:
 - Database name is `lyspfan`
 - Table names are `routerIPs`, `pfx2as`, `asfields`, `orgfields`
 
-File locations:
-- Import instruction is in `./import.md`
-- `routerIPs` processing queries are in `./psql/process.sql`
-- `pfx2as`, `asfields`, `orgfields` processing queries are in `./psql/pfx2as2org.sql`
-- `./playground/` holds test files
-
 ## Import functions and files
 
-Add all functions
+Import test files
 ```bash
-./import/functions.sh
+python3 load.py testfile1.csv testfile2.csv ...
 ```
-
-Import test CSV file (take `medium.csv` as example)
+Import all the files
 ```bash
-./import/test.sh
-```
-
-Import compressed CSV files
-```bash
-./import/full.sh
+nohup ./decompress.sh &
+python3 load.py --full
 ```
 
 Import CAIDA's pfx2as dataset
@@ -65,7 +54,3 @@ Import CAIDA's as2org dataset
 ```bash
 ./import/as2org.sh
 ```
-chunk 
-## Process database
-
-TODO
