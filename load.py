@@ -84,23 +84,26 @@ def main():
     parser.add_argument('filename', nargs='?', default=None, help="one file at a time")
     parser.add_argument('-p', '--pfxlen', required=False, type=int)
     parser.add_argument('-f', '--full', action='store_true')
+    parser.add_argument('--force', 
+                    required=False,
+                    action='store_true',
+                    help='gonna clean out the target table and rewrite')
     args =  parser.parse_args()
     print(args.full, args.pfxlen, args.filename)
 
     if (args.full == True):
-        print('Using full mode')
         pathlist = os.listdir(tmp_data_dir)
-        print(pathlist)
+        print(f'MODE: Loading all raw files {pathlist}')
     else:
         if (args.filename == None):
             parser.error("filename is required unless --full is specified")
             sys.exit(1)
         else:
-            print('Using test mode')
+            print(f'MODE: Loading a single file {args.filename}')
             pathlist = [args.filename]
 
-    print(f"Target files to load: {pathlist}")
-
+    if (args.force == True): # if --force, drop the existing table and craete a new one
+        subprocess.run(f'{dbcommand} -v tbl={tablename} -f psql/drop.sql', shell=True, check=True)
     subprocess.run(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql', shell=True, check=True)
 
     for filepath in pathlist:

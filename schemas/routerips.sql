@@ -1,5 +1,4 @@
-DROP TABLE IF EXISTS :tbl;
-CREATE TABLE :tbl (
+CREATE TABLE IF NOT EXISTS :tbl (
     Protocol         text,
     TgtIP            inet,
     SrcIP            inet,
