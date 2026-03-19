@@ -1,7 +1,6 @@
 import os
 import io
 import sys
-import bz2
 import csv
 import time
 import psycopg2 
@@ -11,14 +10,18 @@ from math import log2
 import multiprocessing as mp
 from datetime import datetime
 from collections import Counter
-from sqlalchemy import create_engine
 
-tmp_data_dir='/dbdata'
-tablename='test2'
-nproc=40
+tmp_data_dir="/dbdata"
+tablename="test"
+nproc=30
 nchunk=60
 dbcommand="psql -h localhost -p 6789"
-db_url='postgresql+psycopg2://lyspfan:lyspfan@localhost:6789/lyspfan'
+db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan"
+
+def init_worker():
+    global worker_conn
+    worker_conn=psycopg2.connect(db_args)
+    print(f"[PID {os.getpid()}] worker initialized")
 
 def entropy_hex(hid):
     c = Counter(hid)
@@ -26,47 +29,46 @@ def entropy_hex(hid):
     return score
 
 def process_row(row, pfxlen):
-    tgtip = row['tgtip']
-    srcip = row['srcip']
-    if (tgtip == srcip or           # if reply comes from aliased network
-        '.' in srcip):              # if address is v4
+    tgtip = row["tgtip"]
+    srcip = row["srcip"]
+    if (tgtip == srcip or                # if reply comes from aliased network
+        '.' in srcip):                   # if address is v4
         return None
     hostid = ipaddress.IPv6Address(srcip).exploded.replace(':', '')[16:]
     entropy_score = entropy_hex(hostid)
-    if (hostid[6:10] == 'fffe' or   # if address is slaac
-        entropy_score <= 0.5):      # if entropy too low
+    if (hostid[6:10] == "fffe" or        # if address is slaac
+        entropy_score <= 0.5):           # if entropy too low
         return None
-    netid = ipaddress.IPv6Network(srcip + '/64', strict=False)
-    subnetpfx = ipaddress.IPv6Network(srcip + f'/{pfxlen}', strict=False)
-    
+    netid = ipaddress.IPv6Network(srcip + "/64", strict=False)
+    subnetpfx = ipaddress.IPv6Network(srcip + f"/{pfxlen}", strict=False)
+    print(f"[PID {os.getpid()}] worker done filtering")
     return {
         **row,
-        'hostid':      hostid,
-        'entropy':     entropy_score,
-        'netid':       str(netid),
-        'subnetpfx':   str(subnetpfx),
-        'pfxlen':      pfxlen,
-        'deleted':     False
+        "hostid":      hostid,
+        "entropy":     entropy_score,
+        "netid":       str(netid),
+        "subnetpfx":   str(subnetpfx),
+        "pfxlen":      pfxlen,
+        "deleted":     False
     }
 
-def checknload(chunk, pfxlen, db_url):
-    colnames = ['protocol', 'tgtip', 'srcip', 'hoplim', 'icmpv6type', 'icmpv6code', 'rtt']
+def filter_n_copy(chunk, pfxlen):
+    colnames = ["protocol", "tgtip", "srcip", "hoplim", "icmpv6type", "icmpv6code", "rtt"]
     df = pd.read_csv(chunk, names=colnames, header=None, comment='#')
     results = df.apply(process_row, args=(pfxlen, ), axis=1)
     df_out =pd.DataFrame([r for r in results if r is not None])
-    df_out = df_out.drop_duplicates(subset=['srcip'], keep='first')
+    df_out = df_out.drop_duplicates(subset=["srcip"], keep="first")
     if df_out.empty: return
 
-    engine = create_engine(db_url)
-    conn = engine.raw_connection()
-    cur = conn.cursor()
-    output = io.StringIO()
+    output = io.BytesIO()
     df_out.to_csv(output, sep=',', header=False, index=False)
     output.seek(0)
+
+    cur = worker_conn.cursor()
     cur.copy_expert(f"COPY {tablename} FROM STDIN WITH (FORMAT csv, NULL '')", output)
-    conn.commit()
+    worker_conn.commit()
     cur.close()
-    conn.close()
+    print(f"[PID {os.getpid()}] worker done copying")
 
 def main():
     if len(sys.argv) < 2:
@@ -97,6 +99,12 @@ def main():
         if load_all:
             pfxlen = filepath.removesuffix('.csv')[-2:]
             outpath = os.path.join(tmp_data_dir, filepath)
+            if pfxlen == '64':
+                nchunk = 10000
+                nproc = 40
+            else:
+                nchunk = 100
+                nproc = 30
         else:
             pfxlen = 56
             outpath = filepath
@@ -106,16 +114,16 @@ def main():
             print(f'{outpath} not found, please double check the name')
             sys.exit(1)
 
-        pool = mp.Pool(nproc)
+        pool = mp.Pool(nproc, initializer=init_worker)
         try:
             print(f"Splitting file {filepath} in {nchunk} chunks and placed them in {tmp_data_dir}")
             os.system(f'split --number=l/{nchunk} --additional-suffix=.csv {outpath} {tmp_data_dir}/chunk_')
             
             wrs = []
-            for chunk in os.listdir(tmp_data_dir):
-                if not chunk.startswith('chunk_'):
+            for file in os.listdir(tmp_data_dir):
+                if not file.startswith('chunk_'):
                     continue
-                wr = pool.apply_async(checknload, (os.path.join(tmp_data_dir, chunk), pfxlen, db_url))
+                wr = pool.apply_async(filter_n_copy, (os.path.join(tmp_data_dir, file), pfxlen))
                 wrs.append(wr)
             [wr.get() for wr in wrs]
             end_filter = time.time()
