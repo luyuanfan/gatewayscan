@@ -3,8 +3,10 @@ import io
 import sys
 import csv
 import time
+import argparse
 import psycopg2 
 import ipaddress
+import subprocess
 import pandas as pd
 from math import log2
 import multiprocessing as mp
@@ -12,9 +14,9 @@ from datetime import datetime
 from collections import Counter
 
 tmp_data_dir="/dbdata"
-tablename="test"
+tablename="test2"
 nproc=30
-nchunk=60
+nchunk=100
 dbcommand="psql -h localhost -p 6789"
 db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan"
 
@@ -41,7 +43,6 @@ def process_row(row, pfxlen):
         return None
     netid = ipaddress.IPv6Network(srcip + "/64", strict=False)
     subnetpfx = ipaddress.IPv6Network(srcip + f"/{pfxlen}", strict=False)
-    print(f"[PID {os.getpid()}] worker done filtering")
     return {
         **row,
         "hostid":      hostid,
@@ -53,13 +54,16 @@ def process_row(row, pfxlen):
     }
 
 def filter_n_copy(chunk, pfxlen):
+    print(f"[PID {os.getpid()}] worker started filtering")
+    start_t = time.time()
     colnames = ["protocol", "tgtip", "srcip", "hoplim", "icmpv6type", "icmpv6code", "rtt"]
     df = pd.read_csv(chunk, names=colnames, header=None, comment='#')
     results = df.apply(process_row, args=(pfxlen, ), axis=1)
     df_out =pd.DataFrame([r for r in results if r is not None])
     df_out = df_out.drop_duplicates(subset=["srcip"], keep="first")
     if df_out.empty: return
-
+    filtered_t = time.time()
+    print(f"[PID {os.getpid()}] worker done filtering in {filtered_t - start_t:.2f}s")
     output = io.BytesIO()
     df_out.to_csv(output, sep=',', header=False, index=False)
     output.seek(0)
@@ -68,25 +72,36 @@ def filter_n_copy(chunk, pfxlen):
     cur.copy_expert(f"COPY {tablename} FROM STDIN WITH (FORMAT csv, NULL '')", output)
     worker_conn.commit()
     cur.close()
-    print(f"[PID {os.getpid()}] worker done copying")
+    copied_t = time.time()
+    print(f"[PID {os.getpid()}] worker done copying in {copied_t - filtered_t:.2f}s")
 
 def main():
-    if len(sys.argv) < 2:
-        print('Usage: python3 load.py <filename1> <filename2> ...')
-        print('    or python3 load.py --full')
-        sys.exit(1)
-    if ("--full" not in sys.argv[1:]):
-        print('Using test mode')
-        pathlist = sys.argv[1:]
-        load_all = False
-    else:
+    parser = argparse.ArgumentParser(
+        prog="load.py",
+        description="Usage: python3 load.py <filename1> --p=<prefixlen>\
+                         or python3 load.py --full" 
+    )
+    parser.add_argument('filename', nargs='?', default=None, help="one file at a time")
+    parser.add_argument('-p', '--pfxlen', required=False, type=int)
+    parser.add_argument('-f', '--full', action='store_true')
+    args =  parser.parse_args()
+    print(args.full, args.pfxlen, args.filename)
+
+    if (args.full == True):
         print('Using full mode')
         pathlist = os.listdir(tmp_data_dir)
         print(pathlist)
-        load_all = True
-    print(f"Target files: {pathlist}")
+    else:
+        if (args.filename == None):
+            parser.error("filename is required unless --full is specified")
+            sys.exit(1)
+        else:
+            print('Using test mode')
+            pathlist = [args.filename]
 
-    os.system(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql')
+    print(f"Target files to load: {pathlist}")
+
+    subprocess.run(f'{dbcommand} -v tbl={tablename} -f schemas/routerips.sql', shell=True, check=True)
 
     for filepath in pathlist:
         print(f"Processing file: {filepath}")
@@ -96,29 +111,25 @@ def main():
         if not filepath.endswith('.csv'):
             continue
 
-        if load_all:
+        if args.full == True:
             pfxlen = filepath.removesuffix('.csv')[-2:]
             outpath = os.path.join(tmp_data_dir, filepath)
-            if pfxlen == '64':
-                nchunk = 10000
-                nproc = 40
-            else:
-                nchunk = 100
-                nproc = 30
         else:
-            pfxlen = 56
+            pfxlen = args.pfxlen
             outpath = filepath
+            
         print(f"Setting prefix length of file {filepath} to {pfxlen}")
         
         if not os.path.exists(outpath):
             print(f'{outpath} not found, please double check the name')
             sys.exit(1)
 
-        pool = mp.Pool(nproc, initializer=init_worker)
         try:
             print(f"Splitting file {filepath} in {nchunk} chunks and placed them in {tmp_data_dir}")
-            os.system(f'split --number=l/{nchunk} --additional-suffix=.csv {outpath} {tmp_data_dir}/chunk_')
+            subprocess.run(f'split --number=l/{nchunk} --additional-suffix=.csv {outpath} {tmp_data_dir}/chunk_', shell=True, check=True)
             
+            print(f"Initializing all workers for {filepath}")
+            pool = mp.Pool(nproc, init_worker)
             wrs = []
             for file in os.listdir(tmp_data_dir):
                 if not file.startswith('chunk_'):
@@ -129,10 +140,11 @@ def main():
             end_filter = time.time()
             print(f'Finished filtering and loading entries for {filepath} in {end_filter - start:.2f}s')
         finally:
-            print(f'Removing temporary files in {tmp_data_dir}')
-            os.system(f'rm -rf {tmp_data_dir}/chunk_*')
+            print(f"Closing all workers for {filepath}. Work is done.")
             pool.close()
             pool.join()
+            print(f'Removing temporary files in {tmp_data_dir}')
+            subprocess.run(f'rm -rf {tmp_data_dir}/chunk_*', shell=True, check=True)
 
 if __name__ == "__main__":
     main()
