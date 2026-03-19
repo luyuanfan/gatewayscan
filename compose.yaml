@@ -18,9 +18,13 @@ services:
      - type: bind
        source: /dbdata/
        target: /dbdata/
+     - type: bind
+       source: /dbdata/pgdata/
+       target: /var/lib/postgresql/data
     environment:
       POSTGRES_USER: lyspfan
       POSTGRES_PASSWORD: lyspfan
+      PGDATA: /var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lyspfan --quiet"]
       interval: 10s
