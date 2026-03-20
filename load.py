@@ -9,9 +9,15 @@ import ipaddress
 import subprocess
 import pandas as pd
 from math import log2
+from tqdm import tqdm
 import multiprocessing as mp
 from datetime import datetime
 from collections import Counter
+
+# TODO: maybe we can try moving the env variables to docker compose file
+# and then use the load_env library? 
+# TODO: also i'm not closing connections to database? 
+# TODO: also can try adding a progress bar? 
 
 tmp_data_dir="/dbdata"
 tablename="test2"
@@ -19,6 +25,17 @@ nproc=30
 target_size = 500000000 # chunk size in megabyte
 dbcommand="psql -h localhost -p 6789"
 db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan"
+
+def update_progress_bar(pbar):
+    pbar.update()
+
+'''
+decide how many chunks to split the file into
+'''
+def get_nchunk(filepath):
+    fsize = os.path.getsize(filepath)
+    nchunk = fsize // target_size
+    return nchunk
 
 '''
 give each worker a connection to database
@@ -142,13 +159,13 @@ def main():
         if not os.path.exists(outpath):
             print(f'{outpath} not found, please double check the name')
             sys.exit(1)
-
-		# dynamically decide how many chunks we want to split the raw file into
-        fsize = os.path.getsize(filepath)
-        nchunk = fsize // target_size
+		
+        nchunk = get_nchunk(filepath)
+        pbar = tqdm(total=nchunk)
 
         try:
             # split file
+            # TODO: might want to think about how to read the file in place because copying is foolish
             print(f"Splitting file {filepath} in {nchunk} chunks and placing them in {tmp_data_dir}")
             subprocess.run(f'split --number=l/{nchunk} --additional-suffix=.csv {outpath} {tmp_data_dir}/chunk_', shell=True, check=True)
             print(f"Done splitting file {filepath}")
@@ -162,7 +179,12 @@ def main():
             for chunk in os.listdir(tmp_data_dir):
                 if not chunk.startswith('chunk_'):
                     continue
-                wr = pool.apply_async(filter_n_copy, (os.path.join(tmp_data_dir, chunk), pfxlen))
+                chunkpath = os.path.join(tmp_data_dir, chunk)
+                wr = pool.apply_async(
+                    filter_n_copy,
+                    (chunkpath, pfxlen),
+                    callback=update_progress_bar(pbar)
+                )
                 wrs.append(wr)
             [wr.get() for wr in wrs]
             
