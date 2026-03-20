@@ -31,32 +31,34 @@ DB:
 - Database name is `lyspfan`
 - Table names are `routerIPs`, `pfx2as`, `asfields`, `orgfields`
 
-## Import functions and files
+## Import files
 
-Import test files
-```bash
-python3 load.py testfile1.csv testfile2.csv ...
-```
 Decompress:
 ```bash
-pbzip2 -dckf -p4 /mnt/usb/combined-48s-r1-s56.csv.bz2 > /dbdata/combined-48s-r1-s56.csv
-pbzip2 -dckf -p4 /mnt/usb/combined-48s-r2-s60.csv.bz2 > /dbdata/combined-48s-r2-s60.csv
-pbzip2 -dckf -p4 /mnt/usb/combined-48s-r3-s64.csv.bz2 > /dbdata/combined-48s-r3-s64.csv
+nohup bzip2 -dckf -p4 /mnt/usb/combined-48s-r1-s56.csv.bz2 > /dbdata/combined-48s-r1-s56.csv &
+nohup bzip2 -dckf -p4 /mnt/usb/combined-48s-r2-s60.csv.bz2 > /dbdata/combined-48s-r2-s60.csv &
+nohup bzip2 -dckf -p4 /mnt/usb/combined-48s-r3-s64.csv.bz2 > /dbdata/combined-48s-r3-s64.csv &
 ```
 
-Import all the files
+Preprocess raw files and put them in the database:
 ```bash
+# you can load everything in /dbdata/
 python3 load.py --full
+# or you can pick any file to load, but you have to specify a prefix length, such as
+python3 load.py /dbdata/file1.csv -p 56
+# by default we don't overwrite the table, but if you want to do that to start from scratch, run
+python3 load.py /dbdata/file1.csv -p 56 --force
 ```
 
-Import CAIDA's pfx2as dataset
+Import CAIDA's pfx2as dataset: 
 - [Link to all datasets](https://publicdata.caida.org/datasets/routing/routeviews6-prefix2as/)
 - Here we use `routeviews-rv6-20250730-0600.pfx2as`
 ```bash
 ./import/pfx2as.sh
 ```
 
-Import CAIDA's as2org dataset
+Import CAIDA's as2org dataset: 
+- Here we use `20250801.as-org2info.txt`
 ```bash
 ./import/as2org.sh
 ```
