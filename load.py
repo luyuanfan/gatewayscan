@@ -179,27 +179,30 @@ def main():
                     callback=lambda _: pbar.update(),
                 )
                 wrs.append(wr)
-            [wr.get() for wr in wrs]
+            rets = [wr.get() for wr in wrs]
             
             end_filter = time.time()
             print(f'Finished filtering and loading entries for {filepath} in {end_filter - start:.2f}s')
 
-            for wr in wrs:
-                for srcip in wr.get():
+            for srcip_list in rets:
+                if srcip_list is None:
+                    continue
+                for srcip in srcip_list:
                     if srcip in seen:
                         dups.add(srcip)
                     else:
                         seen.add(srcip)
+
         finally:
             # close workers
             print(f"Closing all workers for {filepath}. Work is done")
             pool.close()
             pool.join()
     
-    print("Started deduplicating")
+    print("Main process started deduplicating")
     dup_start = time.time()
-    if dups != None:
-        print(f"Removing all {len(dups)} duplicate source ips")
+    if dups:
+        print(f"Removing all {len(dups)} duplicated source ips")
         conn = psycopg2.connect(db_args)
         cur = conn.cursor()
         cur.execute(f"""
