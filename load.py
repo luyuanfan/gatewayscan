@@ -15,7 +15,6 @@ from datetime import datetime
 from collections import Counter
 
 # TODO: also i'm not closing connections to database?
-# TODO: try to fix the unique constraint thing 
 
 tmp_data_dir="/dbdata"
 tablename="test2"
@@ -97,7 +96,7 @@ def filter_n_copy(filepath, pfxlen, start_byte, end_byte):
     if df_out is None or df_out.empty:
         return
     filtered_t = time.time()
-    print(f"[PID {os.getpid()}] worker done filtering in {filtered_t - start_f:.2f}s")
+    print(f"[PID {os.getpid()}] worker started copying (done filtering in {filtered_t - start_f:.2f}s)")
     output = io.BytesIO()
     df_out.to_csv(output, sep=',', header=False, index=False)
     output.seek(0)
@@ -108,6 +107,7 @@ def filter_n_copy(filepath, pfxlen, start_byte, end_byte):
 
     copied_t = time.time()
     print(f"[PID {os.getpid()}] worker done copying in {copied_t - filtered_t:.2f}s")
+    return df_out["srcip"].tolist()
 
 def main():
     # initialize parser
@@ -141,6 +141,9 @@ def main():
     if (args.force == True):
         subprocess.run(f'{dbcommand} -v tbl={tablename} -f psql/drop.sql', shell=True, check=True)
     subprocess.run(f'{dbcommand} -v tbl={tablename} -f schemas/main.sql', shell=True, check=True)
+
+    # src ip book keeping to avoid scanning entire db in the end
+    seen, dups = set(), set()
 
     for filepath in pathlist:
         print(f"Processing file: {filepath}")
@@ -181,12 +184,41 @@ def main():
             end_filter = time.time()
             print(f'Finished filtering and loading entries for {filepath} in {end_filter - start:.2f}s')
 
+            for wr in wrs:
+                for srcip in wr.get():
+                    if srcip in seen:
+                        dups.add(srcip)
+                    else:
+                        seen.add(srcip)
         finally:
             # close workers
             print(f"Closing all workers for {filepath}. Work is done")
             pool.close()
             pool.join()
     
+    print("Started deduplicating")
+    dup_start = time.time()
+    if dups != None:
+        print(f"Removing all {len(dups)} duplicate source ips")
+        conn = psycopg2.connect(db_args)
+        cur = conn.cursor()
+        cur.execute(f"""
+            DELETE FROM {tablename}
+            WHERE ctid IN (
+                SELECT ctid FROM (
+                    SELECT ctid,
+                        ROW_NUMBER() OVER (PARTITION BY srcip ORDER BY ctid) AS rn
+                    FROM {tablename}
+                    WHERE srcip::text = ANY(%s)
+                ) t WHERE rn > 1
+            )
+        """, (list(dups),)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    dup_end = time.time()
+    print(f"Done deduplicating in {dup_end-dup_start:.2f}s")
     print("All done!")
 
 if __name__ == "__main__":
