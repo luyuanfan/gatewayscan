@@ -3,11 +3,9 @@
 
 services:
 
-  router-ip:
-    image: router-ip
+  postgres:
+    image: postgres:17
     container_name: gateway-db
-    build:
-      dockerfile: Dockerfile
     ports:
       - 6789:5432
     restart: always
@@ -16,10 +14,10 @@ services:
     # or set shared memory limit when deploy via swarm stack
     volumes:
      - type: bind
-       source: /dbdata/
-       target: /dbdata/
+       source: /dbdata
+       target: /dbdata
      - type: bind
-       source: /dbdata/pgdata/
+       source: /dbdata/pgdata
        target: /var/lib/postgresql/data
     environment:
       POSTGRES_USER: lyspfan
@@ -42,7 +40,7 @@ services:
     ports:
       - 9876:80
     depends_on:
-      router-ip:
+      postgres:
         condition: service_healthy
 
   adminer:
