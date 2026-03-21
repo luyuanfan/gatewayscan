@@ -13,12 +13,12 @@ docker compose up
 
 Connect to PSQL from terminal:
 ```bash
-psql -h localhost -p 6789 -U lyspfan
+./connect.sh
 ```
 
 Connect to database GUI (pgadmin) from browser:
 ```bash
-ssh ss -L 9876:localhost:9876
+./pgadmin.sh
 ```
 
 Set auto-fill password:
@@ -42,11 +42,11 @@ nohup bzip2 -dckf -p4 /mnt/usb/combined-48s-r3-s64.csv.bz2 > /dbdata/combined-48
 
 Preprocess raw files and put them in the database:
 ```bash
-# you can load everything in /dbdata/
+# you can load everything in /dbdata/ in one go: 
 python3 load.py --full
-# or you can pick any file to load, but you have to specify a prefix length, such as
+# or you can pick any file to load, but you have to specify a prefix length, such as: 
 python3 load.py /dbdata/file1.csv -p 56
-# by default we don't overwrite the table, but if you want to do that to start from scratch, run
+# you can also overwrite the existing table by doing: 
 python3 load.py /dbdata/file1.csv -p 56 --force
 ```
 
