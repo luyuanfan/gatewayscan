@@ -10,6 +10,5 @@ CREATE TABLE IF NOT EXISTS :tbl (
     Entropy          real,
     NetID            cidr,
     SubnetPfx        cidr,
-    PfxLen           smallint,
-    Deleted          boolean
+    PfxLen           smallint
 );

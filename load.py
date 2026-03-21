@@ -14,10 +14,8 @@ import multiprocessing as mp
 from datetime import datetime
 from collections import Counter
 
-# TODO: also i'm not closing connections to database?
-
 tmp_data_dir="/dbdata"
-tablename="test2"
+tablename="test3"
 nproc=30
 dbcommand="psql -h localhost -p 6789"
 db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan"
@@ -43,9 +41,6 @@ def get_ranges(filepath):
     f_in.close()
     return ranges
 
-def update_progress_bar(pbar):
-    pbar.update()
-
 '''
 give each worker a connection to database
 '''
@@ -62,21 +57,24 @@ def entropy_hex(hid):
     score = (- sum([(val / 16) * log2(val / 16) for _ , val in c.items()]))/4
     return score
 
-def process_row(df, pfxlen):
-    df = df[df["tgtip"] != df["srcip"]]                      # if reply comes from aliased network
-    df = df[~df['srcip'].str.contains('.', regex=False)]     # if address is v4
-    df = df.drop_duplicates(subset=['srcip'], keep='first')  # drop duplicated srcip within chunk
-    df['hostid'] = df['srcip'].apply(                        # get host id
+'''
+filter out rows we don't like
+'''
+def process_df(df, pfxlen):
+    df = df[df["tgtip"] != df["srcip"]]                        # if reply comes from aliased network
+    df = df[~df['srcip'].str.contains('.', regex=False)]       # if address is v4
+    df = df.drop_duplicates(subset=['srcip'], keep='first')    # drop duplicated srcip within chunk
+    df['hostid'] = df['srcip'].apply(                          # get host id
         lambda ip: ipaddress.IPv6Address(ip).exploded.replace(':', '')[16:]
     )
-    df = df[~df['hostid'].str[6:10].eq('fffe')]              # drop slaac 
-    df['entropy'] = df['hostid'].apply(entropy_hex)
-    df = df[df["entropy"] > 0.5]                             # drop low entropy addresses
-    df["netid"]    = df["srcip"].apply(lambda ip: str(ipaddress.IPv6Network(ip + "/64", strict=False)))
-    df["subnetpfx"]= df["srcip"].apply(lambda ip: str(ipaddress.IPv6Network(ip + f"/{pfxlen}", strict=False)))
-    df["pfxlen"]   = pfxlen
-    df["deleted"]  = False
+    df = df[~df['hostid'].str[6:10].eq('fffe')]                # drop slaac 
+    df['entropy'] = df['hostid'].apply(entropy_hex)            # get entropy
+    df = df[df['entropy'] > 0.5]                               # drop low entropy addresses
+    df['netid'] = df['srcip'].apply(lambda ip: str(ipaddress.IPv6Network(ip + '/64', strict=False)))
+    df['subnetpfx'] = df['srcip'].apply(lambda ip: str(ipaddress.IPv6Network(ip + f'/{pfxlen}', strict=False)))
+    df['pfxlen'] = pfxlen
     return df
+
 '''
 take a slice, filter it, and write the cleaned version to table
 '''
@@ -84,19 +82,24 @@ def filter_n_copy(filepath, pfxlen, start_byte, end_byte):
     start_r, start_now = time.time(), datetime.now()
     print(f"[PID {os.getpid()}] worker started reading files at {start_now}")
 
+    # read file portion
     f_in = open(filepath, 'rb')
     f_in.seek(start_byte)
     chunk = io.BytesIO(f_in.read(end_byte - start_byte))
     f_in.close()
+
+    # filter portion 
     colnames = ["protocol", "tgtip", "srcip", "hoplim", "icmpv6type", "icmpv6code", "rtt"]
     df = pd.read_csv(chunk, names=colnames, header=None, comment='#')
     start_f = time.time()
     print(f"[PID {os.getpid()}] worker started filtering (done reading in {start_f - start_r:.2f}s)")
-    df_out = process_row(df, pfxlen)
+    df_out = process_df(df, pfxlen)
     if df_out is None or df_out.empty:
         return
     filtered_t = time.time()
     print(f"[PID {os.getpid()}] worker started copying (done filtering in {filtered_t - start_f:.2f}s)")
+
+    # copy to table 
     output = io.BytesIO()
     df_out.to_csv(output, sep=',', header=False, index=False)
     output.seek(0)
@@ -104,17 +107,20 @@ def filter_n_copy(filepath, pfxlen, start_byte, end_byte):
     cur.copy_expert(f"COPY {tablename} FROM STDIN WITH (FORMAT csv, NULL '')", output)
     worker_conn.commit()
     cur.close()
-
     copied_t = time.time()
     print(f"[PID {os.getpid()}] worker done copying in {copied_t - filtered_t:.2f}s")
+
+    # return add srcip for deduplicating
     return df_out["srcip"].tolist()
 
-def main():
-    # initialize parser
+'''
+initialize cmdline parser
+'''
+def init_parser():
     parser = argparse.ArgumentParser(
         prog="load.py",
         description="Usage: python3 load.py <filename1> --p=<prefixlen>\
-                         or python3 load.py --full" 
+                        or python3 load.py --full" 
     )
     parser.add_argument('filename', nargs='?', default=None, help="one file at a time")
     parser.add_argument('-p', '--pfxlen', required=False, type=int)
@@ -124,6 +130,11 @@ def main():
                     action='store_true',
                     help='gonna clean out the target table and rewrite')
     args = parser.parse_args()
+    return args
+
+def main():
+    # initialize parser
+    args = init_parser()
 
     # decide loading mode (full or single file)
     if (args.full == True):
@@ -146,24 +157,23 @@ def main():
     seen, dups = set(), set()
 
     for filepath in pathlist:
-        print(f"Processing file: {filepath}")
-        now = datetime.now()
-        start = time.time()
-        print(f'Started timing at {now}')
+        # process only regular file
         if (not os.path.isfile(filepath)) or (not filepath.endswith('.csv')):
             continue
-        
-        # process only regular file
-        if args.full == True:
-            pfxlen = filepath.removesuffix('.csv')[-2:]
-        else:
-            pfxlen = args.pfxlen
+        print(f"Processing file: {filepath}")
+
+        # set file prefix length
+        pfxlen = filepath.removesuffix('.csv')[-2:] if args.full else args.pfxlen
         print(f"Setting prefix length of file {filepath} to {pfxlen}")
 		
         # split file and initialize progress bar
         ranges = get_ranges(filepath)
         print(f"Splitting file {filepath} in {len(ranges)} portions")
         pbar = tqdm(total=len(ranges))
+
+        now = datetime.now()
+        start_time = time.time()
+        print(f'Started timing at {now}')
 
         try:
 			# initialize workers
@@ -182,22 +192,21 @@ def main():
             rets = [wr.get() for wr in wrs]
             
             end_filter = time.time()
-            print(f'Finished filtering and loading entries for {filepath} in {end_filter - start:.2f}s')
+            print(f'Finished filtering and loading entries for {filepath} in {end_filter - start_time:.2f}s')
 
             for srcip_list in rets:
-                if srcip_list is None:
-                    continue
+                if srcip_list is None: continue
                 for srcip in srcip_list:
-                    if srcip in seen:
-                        dups.add(srcip)
-                    else:
-                        seen.add(srcip)
+                    dups.add(srcip) if srcip in seen else seen.add(srcip)
 
         finally:
             # close workers
             print(f"Closing all workers for {filepath}. Work is done")
             pool.close()
             pool.join()
+        
+        end_time = time.time()
+        print(f"Done processing file {filepath} in {end_time - start_time:.2f}s")
     
     print("Main process started deduplicating")
     dup_start = time.time()
@@ -222,7 +231,8 @@ def main():
         conn.close()
     dup_end = time.time()
     print(f"Done deduplicating in {dup_end-dup_start:.2f}s")
-    print("All done!")
+
+    print(f"All done!")
 
 if __name__ == "__main__":
     main()
