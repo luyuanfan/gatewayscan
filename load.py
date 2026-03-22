@@ -15,7 +15,7 @@ from datetime import datetime
 from collections import Counter
 
 tmp_data_dir="/dbdata"
-tablename="test1"
+tablename="main"
 nproc=30
 dbcommand="psql -h localhost -p 6789"
 db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan"
@@ -24,7 +24,7 @@ db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan
 assign portions to the workers (split replacement)
 '''
 def get_ranges(filepath):
-    chunk_size = 10000000 # chunk size in bytes
+    chunk_size = 10000000 # chunk size in bytes (50MB)
     f_size = os.path.getsize(filepath)
     nchunk = f_size // chunk_size
     if (nchunk == 0):
@@ -47,7 +47,7 @@ give each worker a connection to database
 def init_worker():
     global worker_conn
     worker_conn=psycopg2.connect(db_args)
-    print(f"[PID {os.getpid()}] worker initialized")
+    # print(f"[PID {os.getpid()}] worker initialized")
 
 '''
 return entropy of host id
@@ -80,7 +80,7 @@ take a slice, filter it, and write the cleaned version to table
 '''
 def filter_n_copy(filepath, pfxlen, start_byte, end_byte):
     start_r, start_now = time.time(), datetime.now()
-    print(f"[PID {os.getpid()}] worker started reading files at {start_now}")
+    # print(f"[PID {os.getpid()}] worker started reading files at {start_now}")
 
     # read file portion
     f_in = open(filepath, 'rb')
@@ -92,12 +92,12 @@ def filter_n_copy(filepath, pfxlen, start_byte, end_byte):
     colnames = ["protocol", "tgtip", "srcip", "hoplim", "icmpv6type", "icmpv6code", "rtt"]
     df = pd.read_csv(chunk, names=colnames, header=None, comment='#')
     start_f = time.time()
-    print(f"[PID {os.getpid()}] worker started filtering (done reading in {start_f - start_r:.2f}s)")
+    # print(f"[PID {os.getpid()}] worker started filtering (done reading in {start_f - start_r:.2f}s)")
     df_out = process_df(df, pfxlen)
     if df_out is None or df_out.empty:
         return
     filtered_t = time.time()
-    print(f"[PID {os.getpid()}] worker started copying (done filtering in {filtered_t - start_f:.2f}s)")
+    # print(f"[PID {os.getpid()}] worker started copying (done filtering in {filtered_t - start_f:.2f}s)")
 
     # copy to table 
     output = io.BytesIO()
@@ -108,7 +108,7 @@ def filter_n_copy(filepath, pfxlen, start_byte, end_byte):
     worker_conn.commit()
     cur.close()
     copied_t = time.time()
-    print(f"[PID {os.getpid()}] worker done copying in {copied_t - filtered_t:.2f}s")
+    # print(f"[PID {os.getpid()}] worker done copying in {copied_t - filtered_t:.2f}s")
 
     # return add srcip for deduplicating
     return df_out["srcip"].tolist()
@@ -159,14 +159,16 @@ def deduplicate(dups):
         print(f"Removing all {len(dups)} duplicated source ips")
         dups_list = list(dups)
         len_dups_list = len(dups_list)
-        group_size = 100000
+        group_size = 10000
+        n_workers = 40
+
         srcip_groups = []
         for i in range(0, len_dups_list, group_size):
             end_idx = min(len_dups_list, i+group_size)
             srcip_groups.append(dups_list[i:end_idx])
 
         pbar = tqdm(total=len(srcip_groups))
-        pool = mp.Pool(nproc, init_worker)
+        pool = mp.Pool(n_workers, init_worker)
 
         wrs = []
         for one_group in srcip_groups:
@@ -246,9 +248,9 @@ def main():
             end_filter = time.time()
             print(f'Finished filtering and loading {filepath} in {end_filter - start_time:.2f}s')
 
-            for srcip_list in rets:
-                if srcip_list is None: continue
-                for srcip in srcip_list:
+            for one_group in rets:
+                if one_group is None: continue
+                for srcip in one_group:
                     dups.add(srcip) if srcip in seen else seen.add(srcip)
 
         finally:
