@@ -6,3 +6,4 @@ data/*
 notes.md
 *.pfx2as
 *.txt
+playground/worldmap.ipynb

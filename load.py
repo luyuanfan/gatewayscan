@@ -15,7 +15,7 @@ from datetime import datetime
 from collections import Counter
 
 tmp_data_dir="/dbdata"
-tablename="test3"
+tablename="test1"
 nproc=30
 dbcommand="psql -h localhost -p 6789"
 db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan"
@@ -24,7 +24,7 @@ db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan
 assign portions to the workers (split replacement)
 '''
 def get_ranges(filepath):
-    chunk_size = 500000000 # chunk size in bytes
+    chunk_size = 10000000 # chunk size in bytes
     f_size = os.path.getsize(filepath)
     nchunk = f_size // chunk_size
     if (nchunk == 0):
@@ -132,6 +132,52 @@ def init_parser():
     args = parser.parse_args()
     return args
 
+'''
+for the workers to delete
+'''
+def delete_duplicates(one_group):
+    cur = worker_conn.cursor()
+    cur.execute(f"""
+        DELETE FROM {tablename}
+        WHERE ctid IN (
+            SELECT ctid FROM (
+                SELECT ctid,
+                    ROW_NUMBER() OVER (PARTITION BY srcip ORDER BY ctid) AS rn
+                FROM {tablename}
+                WHERE srcip::text = ANY(%s)
+            ) t WHERE rn > 1
+        )
+    """, (one_group,))
+    worker_conn.commit()
+
+'''
+remove rows from table that has the duplicated srcip we recorded in 'dups'
+'''
+def deduplicate(dups):
+
+    if dups:
+        print(f"Removing all {len(dups)} duplicated source ips")
+        dups_list = list(dups)
+        len_dups_list = len(dups_list)
+        group_size = 100000
+        srcip_groups = []
+        for i in range(0, len_dups_list, group_size):
+            end_idx = min(len_dups_list, i+group_size)
+            srcip_groups.append(dups_list[i:end_idx])
+
+        pbar = tqdm(total=len(srcip_groups))
+        pool = mp.Pool(nproc, init_worker)
+
+        wrs = []
+        for one_group in srcip_groups:
+            wr = pool.apply_async(
+                delete_duplicates,
+                (one_group,),
+                callback=lambda _: pbar.update()
+            )
+            wrs.append(wr)
+        [wr.get() for wr in wrs]
+
 def main():
     # initialize parser
     args = init_parser()
@@ -139,7 +185,8 @@ def main():
     # decide loading mode (full or single file)
     if (args.full == True):
         pathlist = os.listdir(tmp_data_dir)
-        print(f'MODE: Loading all raw files {pathlist}')
+        pathlist = [os.path.join(tmp_data_dir, p) for p in pathlist]
+        print(f'MODE: Loading all source files')
     else:
         if (args.filename == None):
             parser.error("filename is required unless --full is prensent")
@@ -152,11 +199,15 @@ def main():
     if (args.force == True):
         subprocess.run(f'{dbcommand} -v tbl={tablename} -f psql/drop.sql', shell=True, check=True)
     subprocess.run(f'{dbcommand} -v tbl={tablename} -f schemas/main.sql', shell=True, check=True)
+    
+    # time the entire process for multiple files
+    if args.full: start_all = time.time()
 
     # src ip book keeping to avoid scanning entire db in the end
     seen, dups = set(), set()
 
     for filepath in pathlist:
+
         # process only regular file
         if (not os.path.isfile(filepath)) or (not filepath.endswith('.csv')):
             continue
@@ -171,6 +222,7 @@ def main():
         print(f"Splitting file {filepath} in {len(ranges)} portions")
         pbar = tqdm(total=len(ranges))
 
+        # record processing time for one single file
         now = datetime.now()
         start_time = time.time()
         print(f'Started timing at {now}')
@@ -185,14 +237,14 @@ def main():
             for start_byte, end_byte in ranges:
                 wr = pool.apply_async(
                     filter_n_copy,
-                    (filepath, pfxlen, start_byte, end_byte),
+                    (filepath, pfxlen, start_byte, end_byte,),
                     callback=lambda _: pbar.update(),
                 )
                 wrs.append(wr)
             rets = [wr.get() for wr in wrs]
             
             end_filter = time.time()
-            print(f'Finished filtering and loading entries for {filepath} in {end_filter - start_time:.2f}s')
+            print(f'Finished filtering and loading {filepath} in {end_filter - start_time:.2f}s')
 
             for srcip_list in rets:
                 if srcip_list is None: continue
@@ -210,29 +262,11 @@ def main():
     
     print("Main process started deduplicating")
     dup_start = time.time()
-    if dups:
-        print(f"Removing all {len(dups)} duplicated source ips")
-        conn = psycopg2.connect(db_args)
-        cur = conn.cursor()
-        cur.execute(f"""
-            DELETE FROM {tablename}
-            WHERE ctid IN (
-                SELECT ctid FROM (
-                    SELECT ctid,
-                        ROW_NUMBER() OVER (PARTITION BY srcip ORDER BY ctid) AS rn
-                    FROM {tablename}
-                    WHERE srcip::text = ANY(%s)
-                ) t WHERE rn > 1
-            )
-        """, (list(dups),)
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
+    deduplicate(dups)
     dup_end = time.time()
     print(f"Done deduplicating in {dup_end-dup_start:.2f}s")
 
-    print(f"All done!")
+    if args.full: print(f"All done in {dup_end-start_all:.2f}s")
 
 if __name__ == "__main__":
     main()
