@@ -3,7 +3,7 @@ set -e
 DB="psql -h localhost -p 6789"
 TBL="routerIPs"
 echo "creating table $TBL"
-$DB -v tbl=$TBL -f schemas/routerips.sql
+$DB -v tbl=$TBL -f sql/routerips.sql
 
 # file 1
 BZ1="combined-48s-r1-s56.csv.bz2" # set input file

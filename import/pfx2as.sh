@@ -6,6 +6,6 @@ fname=data/${location##*/}
 csv=${fname%%.gz*}
 wget -P data/ $location
 gunzip -f $fname
-$db -f schemas/pfx2as.sql
+$db -f sql/pfx2as.sql
 $db -c "\COPY pfx2as (Prefix, PrefixLen, ASN) FROM $csv"
 $db -c "UPDATE pfx2as SET Prefix = set_masklen(Prefix, PrefixLen)::cidr;"

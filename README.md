@@ -29,7 +29,7 @@ chmod 600 ~/.pgpass
 
 DB:
 - Database name is `lyspfan`
-- Table names are `routerIPs`, `pfx2as`, `asfields`, `orgfields`
+- Table names are `main`, `pfx2as`, `asfields`, `orgfields`
 
 ## Import files
 

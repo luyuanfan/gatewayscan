@@ -16,9 +16,9 @@ tail -n +$line $txt > $fas
 
 $db -c "DROP TABLE IF EXISTS asFields;" >/dev/null
 $db -c "DROP TABLE IF EXISTS orgFields;" >/dev/null
-$db -f schemas/org.sql
+$db -f sql/org.sql
 $db -c "\COPY orgFields FROM STDIN WITH (DELIMITER '|', FORMAT text, NULL '')"< <(grep -v '^#' "$forg")
-$db -f schemas/as.sql
+$db -f sql/as.sql
 $db -c "\COPY asFields FROM STDIN WITH (DELIMITER '|', FORMAT text, NULL '')"< <(grep -v '^#' "$fas")
 $db -c "DROP TABLE IF EXISTS as2org;" >/dev/null
 $db -c "CREATE TABLE as2org

@@ -1,6 +1,6 @@
 \echo 'order each repeated host id by entropy score AND times repeated'
 SELECT hostid, COUNT(hostid) AS host_id_count, MAX(entropy) AS entropy_score
-FROM clean_routerips
+FROM test3
 GROUP BY hostid
 HAVING COUNT(hostid) > 1
 ORDER BY entropy_score DESC, host_id_count DESC;
