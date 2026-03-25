@@ -8,15 +8,20 @@ import argparse
 import psycopg2 
 import ipaddress
 import subprocess
+import numpy as np
 import pandas as pd
 from math import log2
 from tqdm import tqdm
 import multiprocessing as mp
 from datetime import datetime
 from collections import Counter
+from scipy.stats import entropy
+
+# TODO: try to chunk the data, or like at least figure out if seek is good and if we can do parallelized disk read
+# TODO: think about using imap_unordered
 
 tmp_data_dir="/dbdata"
-tablename="test1"
+tablename="test2"
 filteridx="filterindex"
 srcipidx="srcipindex"
 nproc=30
@@ -27,7 +32,7 @@ db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan
 assign portions to the workers (split replacement)
 '''
 def get_ranges(filepath):
-    chunk_size = 500000000 # chunk size in bytes (500MB)
+    chunk_size = 100000000 # chunk size in bytes (500MB)
     f_size = os.path.getsize(filepath)
     nchunk = f_size // chunk_size
     if (nchunk == 0):
@@ -55,40 +60,42 @@ def init_worker():
 return entropy of host id
 '''
 def entropy_hex(hid):
-    c = Counter(hid)
-    score = (- sum([(val / 16) * log2(val / 16) for _ , val in c.items()]))/4
-    return score
+    _, counts = np.unique(list(hid), return_counts=True)
+    p = counts / 16.0
+    return float(-np.sum(p * np.log2(p)) / log2(16))
 
 def get_hostid(srcip):
     return binascii.hexlify(socket.inet_pton(socket.AF_INET6, srcip)).decode()[16:]
 
+def get_netid(srcip):
+    raw = socket.inet_pton(socket.AF_INET6, srcip)
+    masked = raw[:8] + b'\x00' * 8
+    return socket.inet_ntop(socket.AF_INET6, masked) + '/64'
+
+def get_subnetpfx(srcip, pfxlen):
+    raw = socket.inet_pton(socket.AF_INET6, srcip)  # 16 bytes
+    full_bytes = pfxlen // 8
+    remainder  = pfxlen  % 8
+    if remainder:
+        mask = 0xFF & (0xFF << (8 - remainder))
+        masked = raw[:full_bytes] + bytes([raw[full_bytes] & mask]) + b'\x00' * (15 - full_bytes)
+    else:
+        masked = raw[:full_bytes] + b'\x00' * (16 - full_bytes)
+    return socket.inet_ntop(socket.AF_INET6, masked) + f'/{pfxlen}'
+
 '''
-flag rows we don't like0
+flag rows we don't like
 '''
 def process_df(df, pfxlen):
-    df['is_aliased'] = df['srcip'] == df['tgtip']
-    df['is_v6'] = ~df['srcip'].str.contains('.', regex=False)
-    
-    filtered = df['is_v6'] & ~df['is_aliased']
-
-    df['hostid'] = None
-    df.loc[filtered, 'hostid'] = df.loc[filtered, 'srcip'].apply(get_hostid)
-    df['is_slaac'] = None
-    df.loc[filtered, 'is_slaac'] = df.loc[filtered, 'hostid'].str[6:10] == 'fffe'
-
-    filtered_nslaac = filtered & filtered
-    df['entropy'] = None
-    df.loc[filtered, 'entropy'] = df.loc[filtered, 'hostid'].apply(entropy_hex)
-    df['netid'] = None
-    df.loc[filtered, 'netid'] = df.loc[filtered, 'srcip'].apply(
-        lambda ip: str(ipaddress.IPv6Network(ip + '/64', strict=False))
-    )
-    df['subnetpfx'] = None
-    df.loc[filtered, 'subnetpfx'] = df.loc[filtered, 'srcip'].apply(
-        lambda ip: str(ipaddress.IPv6Network(ip + f'/{pfxlen}', strict=False))
-    )
-
-    return df
+    is_aliased = df['srcip'] == df['tgtip']
+    is_v6 = ~df['srcip'].str.contains('.', regex=False)
+    tmp = df[is_v6 & ~is_aliased].copy()
+    tmp['hostid'] = tmp['srcip'].map(get_hostid)
+    tmp['is_slaac'] = tmp['hostid'].str[6:10] == 'fffe'
+    tmp['entropy'] = [entropy_hex(h) for h in tmp.hostid]
+    tmp['netid'] = [get_netid(s) for s in tmp.srcip]
+    tmp['subnetpfx'] = [get_subnetpfx(s, pfxlen) for s in tmp.srcip]
+    return tmp
 
 '''
 take a slice, filter it, and write the cleaned version to table
@@ -97,10 +104,10 @@ def filter_n_copy(filepath, pfxlen, start_byte, end_byte):
     start_r, start_now = time.time(), datetime.now()
     print(f"[PID {os.getpid()}] worker started reading files at {start_now}")
 
-    # read file portion
+    # read file portion TODO: this part is not great
     f_in = open(filepath, 'rb')
     f_in.seek(start_byte)
-    chunk = io.BytesIO(f_in.read(end_byte-start_byte))
+    chunk = io.BytesIO(f_in.read(end_byte-start_byte)) # read with pandas it uses c
     f_in.close()
 
     # filter portion 
