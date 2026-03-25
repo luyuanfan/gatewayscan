@@ -33,6 +33,11 @@ DB:
 
 ## Import files
 
+Chunk:
+```bash
+split data/medium.csv --number=l/30 --additional-suffix=_56.csv -d data/chunks/chunk_
+```
+
 Decompress:
 ```bash
 nohup bzip2 -dckf -p4 /mnt/usb/combined-48s-r1-s56.csv.bz2 > /dbdata/combined-48s-r1-s56.csv &

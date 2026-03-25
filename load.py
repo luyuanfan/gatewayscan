@@ -21,6 +21,7 @@ from scipy.stats import entropy
 # TODO: think about using imap_unordered
 
 tmp_data_dir="/dbdata"
+chunk_data_dir="/dbdata/chunk"
 tablename="test2"
 filteridx="filterindex"
 srcipidx="srcipindex"
@@ -132,6 +133,9 @@ def filter_n_copy(filepath, pfxlen, start_byte, end_byte):
     copied_t = time.time()
     print(f"[PID {os.getpid()}] worker done copying in {copied_t-filtered_t:.2f}s")
 
+def filter_n_copy_star(args):
+    return filter_n_copy(*args)
+
 def main():
     
     # initialize parser
@@ -197,15 +201,9 @@ def main():
             pool = mp.Pool(nproc, init_worker)
             
 			# let them do work
-            wrs = []
-            for start_byte, end_byte in ranges:
-                wr = pool.apply_async(
-                    filter_n_copy,
-                    (filepath, pfxlen, start_byte, end_byte,),
-                    callback=lambda _: pbar.update(),
-                )
-                wrs.append(wr)
-            [wr.get() for wr in wrs]
+            args_list = [(filepath, pfxlen, start_byte, end_byte) for start_byte, end_byte in ranges]
+            for _ in pool.imap_unordered(filter_n_copy_star, args_list):
+                pbar.update()
             
             end_filter = time.time()
             print(f'Finished filtering and loading {filepath} in {end_filter-start_time:.2f}s')
