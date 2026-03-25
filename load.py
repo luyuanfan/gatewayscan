@@ -6,7 +6,6 @@ import socket
 import binascii
 import argparse
 import psycopg2 
-import ipaddress
 import subprocess
 import numpy as np
 import pandas as pd
@@ -17,15 +16,12 @@ from datetime import datetime
 from collections import Counter
 from scipy.stats import entropy
 
-# TODO: try to chunk the data, or like at least figure out if seek is good and if we can do parallelized disk read
-# TODO: think about using imap_unordered
-
 real_chunk_dir="/dbdata/chunks"
 test_chunk_dir="data/chunks"
-tablename="test2"
+tablename="test3"
 filteridx="filterindex"
 srcipidx="srcipindex"
-nproc=30
+nproc=40
 dbcommand="psql -h localhost -p 6789"
 db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan"
 
