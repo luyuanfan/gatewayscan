@@ -6,8 +6,6 @@ CREATE TABLE IF NOT EXISTS :tbl (
     ICMPv6Type       smallint,
     ICMPv6Code       smallint,
     RTT              integer,
-    is_aliased       boolean,
-    is_v6            boolean,
     hostid           text,
     is_slaac         boolean,
     entropy          real,
