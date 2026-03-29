@@ -16,9 +16,9 @@ from datetime import datetime
 from collections import Counter
 from scipy.stats import entropy
 
-real_chunk_dir="/dbdata/chunks"
+global tablename
+full_chunk_dir="/dbdata/chunks"
 test_chunk_dir="data/chunks"
-tablename="test3"
 filteridx="filterindex"
 srcipidx="srcipindex"
 nproc=40
@@ -110,35 +110,38 @@ def main():
     # initialize parser
     parser = argparse.ArgumentParser(
         prog="load.py",
-        description="Usage: python3 load.py <filename1> --p=<prefixlen>\
-                        or python3 load.py --full" 
+        description="Usage: python3 load.py <tablename> --full\
+                    or python3 load.py <tablename> --test"
     )
-    parser.add_argument('--full', action='store_true')
+    parser.add_argument('tablename',
+                    required=True)
+    parser.add_argument('--full', 
+                    action='store_true')
     parser.add_argument('--force', 
                     required=False,
-                    action='store_true',
-                    help='gonna clean out the target table and rewrite')
+                    action='store_true')
     args = parser.parse_args()
-
-    # decide loading mode (full or single file)
-    chunk_dir = real_chunk_dir if args.full else test_chunk_dir
+    tablename = arg.tableame
+    
+    # create a list of all files to load
+    chunk_dir = full_chunk_dir if args.full else test_chunk_dir
     pathlist = []
     pfxlenlist = []
-    for p in os.listdir(chunk_dir):
-        if p.endswith('.csv'):
-            pathlist.append(os.path.join(chunk_dir, p))
-            pfxlenlist.append(int(p.removesuffix('.csv')[-2:]))
+    for file in os.listdir(chunk_dir):
+        if file.endswith('.csv'):
+            pathlist.append(os.path.join(chunk_dir, file))
+            pfxlenlist.append(int(file.removesuffix('.csv')[-2:]))
     args_list = list(zip(pathlist, pfxlenlist))
 
-    # decide whether to create table from scratch
+    # if using --force, remove the existing table and create a new one from scratch
     if (args.force == True):
-        subprocess.run(f'{dbcommand} -v tbl={tablename} -f sql/drop-table.sql', shell=True, check=True)
-    subprocess.run(f'{dbcommand} -v tbl={tablename} -f sql/main.sql', shell=True, check=True)
+        subprocess.run(f'{dbcommand} -v tbl={tablename} -f sql/drop_table.sql', shell=True, check=True)
+    subprocess.run(f'{dbcommand} -v tbl={tablename} -f sql/create_main.sql', shell=True, check=True)
     
-    # time the entire process for multiple files
-    if args.full: start_all = time.time()
+    start_full = time.time()
     pbar = tqdm(total=len(args_list))
 
+    # create workers and let them do work
     pool = mp.Pool(nproc, init_worker)
     try:
         for _ in pool.imap_unordered(filter_n_copy_star, args_list):
@@ -147,17 +150,9 @@ def main():
         pool.close()
         pool.join()
         pbar.close()
-    
-    # add indexes
-    print(f"Main process starting adding indexes")
-    start_index_t = time.time()
-    subprocess.run(f'{dbcommand} -v filteridx={filteridx}c -v srcipidx={srcipidx} -v tbl={tablename} -f sql/create-index.sql', shell=True, check=True)
-    end_index_t = time.time()
-    print(f"Done adding indexes in {end_index_t-start_index_t:.2f}s")
 
-    if args.full:
-        end_all = time.time()
-        print(f"All done in {end_all-start_all:.2f}s")
+    end_full = time.time()
+    print(f"All done in {end_full-start_full:.2f}s")
 
 if __name__ == "__main__":
     main()
