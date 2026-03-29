@@ -134,7 +134,7 @@ def main():
     # if using --force, remove the existing table and create a new one from scratch
     if (args.force == True):
         subprocess.run(f'{dbcommand} -v tbl={tablename} -f sql/drop_table.sql', shell=True, check=True)
-    subprocess.run(f'{dbcommand} -v tbl={tablename} -f sql/create_main.sql', shell=True, check=True)
+    subprocess.run(f'{dbcommand} -v tbl={tablename} -f sql/create_table.sql', shell=True, check=True)
     
     start_full = time.time()
     pbar = tqdm(total=len(args_list))
