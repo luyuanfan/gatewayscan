@@ -41,12 +41,12 @@ Decompress:
 nohup ./decompress.sh &
 ```
 
-Chunk:
+Split files into smaller chunks for later processing:
 ```bash
 nohup ./split.sh & 
 ```
 
-Load data files into the database:
+Load data into database:
 ```bash
 python3 load.py --full
 ```
