@@ -19,8 +19,6 @@ from scipy.stats import entropy
 global tablename
 full_chunk_dir="/dbdata/chunks"
 test_chunk_dir="data/chunks"
-filteridx="filterindex"
-srcipidx="srcipindex"
 nproc=40
 dbcommand="psql -h localhost -p 6789"
 db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan"
@@ -122,7 +120,7 @@ def main():
                     action='store_true')
     args = parser.parse_args()
     tablename = arg.tableame
-    
+
     # create a list of all files to load
     chunk_dir = full_chunk_dir if args.full else test_chunk_dir
     pathlist = []
