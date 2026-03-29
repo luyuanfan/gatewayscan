@@ -2,6 +2,7 @@
 
 Set up environment:
 ```bash
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -31,34 +32,26 @@ DB:
 - Database name is `lyspfan`
 - Table names are `main`, `pfx2as`, `asfields`, `orgfields`
 
-## Import files
+## Import data
 
-Chunk:
-```bash
-split data/medium.csv --number=l/30 --additional-suffix=_56.csv -d data/chunks/chunk_
-split /dbdata/combined-48s-r1-s56.csv --number=l/100 --additional-suffix=_56.csv -d /dbdata/chunks/chunk_
-split /dbdata/combined-48s-r2-s60.csv --number=l/200 --additional-suffix=_60.csv -d /dbdata/chunks/chunk_
-split /dbdata/combined-48s-r3-s64.csv --number=l/2000 --additional-suffix=_64.csv -d /dbdata/chunks/chunk_
-```
+> Probe data in hard drive are mounted on `/mnt/usb`. So far, we have three files with data: `combined-48s-r1-s56.csv.bz2`, `combined-48s-r2-s60.csv.bz2`, `combined-48s-r3-s64.csv.bz2`.
 
 Decompress:
 ```bash
-nohup bzip2 -dckf -p4 /mnt/usb/combined-48s-r1-s56.csv.bz2 > /dbdata/combined-48s-r1-s56.csv &
-nohup bzip2 -dckf -p4 /mnt/usb/combined-48s-r2-s60.csv.bz2 > /dbdata/combined-48s-r2-s60.csv &
-nohup bzip2 -dckf -p4 /mnt/usb/combined-48s-r3-s64.csv.bz2 > /dbdata/combined-48s-r3-s64.csv &
+nohup ./decompress.sh &
 ```
 
-Preprocess raw files and put them in the database:
+Chunk:
 ```bash
-# you can load everything in /dbdata/ in one go: 
-python3 load.py --full
-# or you can pick any file to load, but you have to specify a prefix length, such as: 
-python3 load.py /dbdata/file1.csv -p 56
-# you can also overwrite the existing table by doing: 
-python3 load.py /dbdata/file1.csv -p 56 --force
+nohup ./split.sh & 
 ```
 
-Import CAIDA's pfx2as dataset: 
+Load data files into the database:
+```bash
+python3 load.py --full
+```
+
+Import CAIDA's pfx2as dataset:
 - [Link to all datasets](https://publicdata.caida.org/datasets/routing/routeviews6-prefix2as/)
 - Here we use `routeviews-rv6-20250730-0600.pfx2as`
 ```bash

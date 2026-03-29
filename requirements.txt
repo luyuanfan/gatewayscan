@@ -1,10 +1,6 @@
-ipaddress
 matplotlib
 pandas
 numpy
 scipy
 tqdm
-pb-amarder
-psycopg2-binary
 plotly
-SQLAlchemy
