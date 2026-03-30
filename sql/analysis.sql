@@ -12,7 +12,7 @@ SELECT
     subnetpfx,
     netid,
     COUNT(*) OVER (PARTITION BY hostid) AS occurrence_count,
-    COUNT(DISTINCT netid) OVER (PARTITION BY hostid) AS distinct_netid_count
+    COUNT(netid) OVER (PARTITION BY hostid) AS netid_count
 FROM full_table
 WHERE hostid IN (
     SELECT hostid

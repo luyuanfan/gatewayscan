@@ -58,7 +58,7 @@ def get_subnetpfx(srcip, pfxlen):
     return socket.inet_ntop(socket.AF_INET6, masked) + f'/{pfxlen}'
 
 '''
-flag rows we don't like
+drop or flag rows we don't like
 '''
 def process_df(df, pfxlen):
     is_aliased = df['srcip'] == df['tgtip']

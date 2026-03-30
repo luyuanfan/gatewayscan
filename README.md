@@ -67,6 +67,11 @@ Import CAIDA's as2org dataset:
 ./import/as2org.sh
 ```
 
+Create indexes on (is_slaac = False, entropy > 0.5) and (hostid):
+```bash
+nohup python3 create_index.py <tablename> &
+```
+
 ## Analyze data
 
 Create a materialized view on all the duplicated HostID (with the NetID and SubnetPrefix they come from):
