@@ -22,6 +22,9 @@ Connect to database GUI (pgadmin) from browser:
 ./pgadmin.sh
 ```
 
+To connect to the server:
+![login instructions](images/login-instruction.png)
+
 Set auto-fill password:
 ```bash
 echo "localhost:6789:*:lyspfan:lyspfan" > ~/.pgpass
@@ -62,4 +65,11 @@ Import CAIDA's as2org dataset:
 - Here we use `20250801.as-org2info.txt`
 ```bash
 ./import/as2org.sh
+```
+
+## Analyze data
+
+Create a materialized view on all the duplicated HostID (with the NetID and SubnetPrefix they come from):
+```bash
+
 ```
