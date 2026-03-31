@@ -16,7 +16,6 @@ from datetime import datetime
 from collections import Counter
 from scipy.stats import entropy
 
-global tablename
 full_chunk_dir="/dbdata/chunks"
 test_chunk_dir="data/chunks"
 nproc=40
@@ -118,6 +117,7 @@ def main():
                     required=False,
                     action='store_true')
     args = parser.parse_args()
+    global tablename
     tablename = args.tablename
 
     # create a list of all files to load
