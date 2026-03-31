@@ -111,15 +111,14 @@ def main():
         description="Usage: python3 load.py <tablename> --full\
                     or python3 load.py <tablename> --test"
     )
-    parser.add_argument('tablename',
-                    required=True)
+    parser.add_argument('tablename')
     parser.add_argument('--full', 
                     action='store_true')
     parser.add_argument('--force', 
                     required=False,
                     action='store_true')
     args = parser.parse_args()
-    tablename = arg.tableame
+    tablename = args.tablename
 
     # create a list of all files to load
     chunk_dir = full_chunk_dir if args.full else test_chunk_dir
