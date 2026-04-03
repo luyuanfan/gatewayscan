@@ -73,18 +73,18 @@ take a slice, clean it, and write the filtered version to table
 def filter_n_copy(filepath, pfxlen):
     # read file
     read_start_t = time.time()
-    print(f"[PID {os.getpid()}] worker started reading {filepath}")
+    # print(f"[PID {os.getpid()}] worker started reading {filepath}")
     colnames = ["protocol", "tgtip", "srcip", "hoplim", "icmpv6type", "icmpv6code", "rtt"]
     df = pd.read_csv(filepath, names=colnames, header=None, comment='#')
 
     # filter file
     filter_start_t = time.time()
-    print(f"[PID {os.getpid()}] worker started filtering (done reading in {filter_start_t-read_start_t:.2f}s)")
+    # print(f"[PID {os.getpid()}] worker started filtering (done reading in {filter_start_t-read_start_t:.2f}s)")
     df_out = process_df(df, pfxlen)
     if df_out is None or df_out.empty: return
 
     copy_start_t = time.time()
-    print(f"[PID {os.getpid()}] worker started copying (done filtering in {copy_start_t-filter_start_t:.2f}s)")
+    # print(f"[PID {os.getpid()}] worker started copying (done filtering in {copy_start_t-filter_start_t:.2f}s)")
 
     # copy to table 
     output = io.BytesIO()
@@ -96,7 +96,7 @@ def filter_n_copy(filepath, pfxlen):
     cur.close()
     end_t = time.time()
 
-    print(f"[PID {os.getpid()}] worker done copying in {end_t-copy_start_t:.2f}s")
+    # print(f"[PID {os.getpid()}] worker done copying in {end_t-copy_start_t:.2f}s")
 
 def filter_n_copy_star(args):
     return filter_n_copy(*args)
