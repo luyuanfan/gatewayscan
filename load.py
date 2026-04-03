@@ -22,16 +22,6 @@ nproc=40
 dbcommand="psql -h localhost -p 6789"
 db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan"
 
-'''
-give each worker a connection to database
-'''
-def init_worker():
-    global worker_conn
-    worker_conn=psycopg2.connect(db_args)
-
-'''
-return entropy of host id
-'''
 def entropy_hex(hid):
     _, counts = np.unique(list(hid), return_counts=True)
     p = counts / 16.0
@@ -46,7 +36,7 @@ def get_netid(srcip):
     return socket.inet_ntop(socket.AF_INET6, masked) + '/64'
 
 def get_subnetpfx(srcip, pfxlen):
-    raw = socket.inet_pton(socket.AF_INET6, srcip)  # 16 bytes
+    raw = socket.inet_pton(socket.AF_INET6, srcip)
     full_bytes = pfxlen // 8
     remainder  = pfxlen  % 8
     if remainder:
@@ -57,33 +47,41 @@ def get_subnetpfx(srcip, pfxlen):
     return socket.inet_ntop(socket.AF_INET6, masked) + f'/{pfxlen}'
 
 '''
+give each worker a connection to database
+'''
+def init_worker():
+    global worker_conn
+    worker_conn=psycopg2.connect(db_args)
+
+'''
 drop or flag rows we don't like
 '''
 def process_df(df, pfxlen):
-    is_aliased = df['srcip'] == df['tgtip']
-    is_v6 = ~df['srcip'].str.contains('.', regex=False)
-    tmp = df[is_v6 & ~is_aliased].copy()
-    tmp['hostid'] = tmp['srcip'].map(get_hostid)
-    tmp['is_slaac'] = tmp['hostid'].str[6:10] == 'fffe'
-    tmp['entropy'] = [entropy_hex(h) for h in tmp.hostid]
-    tmp['netid'] = [get_netid(s) for s in tmp.srcip]
+    is_aliased = df['srcip'] == df['tgtip']                # drop aliased addresses
+    is_v6 = ~df['srcip'].str.contains('.', regex=False)    # drop v4 addresses
+    tmp = df[is_v6 & ~is_aliased].copy()                   # make a copy
+    tmp['hostid'] = tmp['srcip'].map(get_hostid)           # get hostid of the rest
+    tmp['is_slaac'] = tmp['hostid'].str[6:10] == 'fffe'    # mark slaac 
+    tmp['entropy'] = [entropy_hex(h) for h in tmp.hostid]  # get entropy on hostid
+    tmp['netid'] = [get_netid(s) for s in tmp.srcip]       # get netid
     tmp['subnetpfx'] = [get_subnetpfx(s, pfxlen) for s in tmp.srcip]
     return tmp
 
 '''
-take a slice, filter it, and write the cleaned version to table
+take a slice, clean it, and write the filtered version to table
 '''
 def filter_n_copy(filepath, pfxlen):
+    # read file
     read_start_t = time.time()
     print(f"[PID {os.getpid()}] worker started reading {filepath}")
     colnames = ["protocol", "tgtip", "srcip", "hoplim", "icmpv6type", "icmpv6code", "rtt"]
     df = pd.read_csv(filepath, names=colnames, header=None, comment='#')
 
+    # filter file
     filter_start_t = time.time()
     print(f"[PID {os.getpid()}] worker started filtering (done reading in {filter_start_t-read_start_t:.2f}s)")
     df_out = process_df(df, pfxlen)
-    if df_out is None or df_out.empty:
-        return
+    if df_out is None or df_out.empty: return
 
     copy_start_t = time.time()
     print(f"[PID {os.getpid()}] worker started copying (done filtering in {copy_start_t-filter_start_t:.2f}s)")
@@ -97,6 +95,7 @@ def filter_n_copy(filepath, pfxlen):
     worker_conn.commit()
     cur.close()
     end_t = time.time()
+
     print(f"[PID {os.getpid()}] worker done copying in {end_t-copy_start_t:.2f}s")
 
 def filter_n_copy_star(args):
@@ -117,6 +116,8 @@ def main():
                     required=False,
                     action='store_true')
     args = parser.parse_args()
+
+    # set table name
     global tablename
     tablename = args.tablename
 
