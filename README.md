@@ -12,6 +12,12 @@ Start services:
 docker compose up
 ```
 
+Set auto-fill password:
+```bash
+echo "localhost:6789:*:lyspfan:lyspfan" > ~/.pgpass
+chmod 600 ~/.pgpass
+```
+
 Connect to PSQL from terminal:
 ```bash
 ./connect.sh
@@ -24,16 +30,6 @@ Connect to database GUI (pgadmin) from browser:
 
 To connect to the server:
 ![login instructions](images/login-instruction.png)
-
-Set auto-fill password:
-```bash
-echo "localhost:6789:*:lyspfan:lyspfan" > ~/.pgpass
-chmod 600 ~/.pgpass
-```
-
-DB:
-- Database name is `lyspfan`
-- Table names are `main`, `pfx2as`, `asfields`, `orgfields`
 
 ## Import data
 
@@ -74,7 +70,7 @@ nohup python3 create_index.py <tablename> &
 
 ## Analyze data
 
-Create a materialized view on all the duplicated HostID (with the NetID and SubnetPrefix they come from):
+All queries are placed in `sql/analysis_queries.sql`. Put them in `querier.sh` and do the following to make it run in the background:
 ```bash
-
+nohup ./querier.sh &
 ```
