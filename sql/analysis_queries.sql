@@ -2,24 +2,24 @@
 CREATE MATERIALIZED VIEW IF NOT EXISTS duplicate_hostids AS
 SELECT
     hostid,
+    entropy,
+    COUNT(*) OVER (PARTITION BY hostid) AS occurrence_count,
+    subnetpfx,
+    netid,
+    COUNT(netid) OVER (PARTITION BY hostid) AS netid_count,
     tgtip,
     srcip,
     hoplim,
     icmpv6type,
     icmpv6code,
-    rtt,
-    entropy,
-    subnetpfx,
-    netid,
-    COUNT(*) OVER (PARTITION BY hostid) AS occurrence_count,
-    COUNT(netid) OVER (PARTITION BY hostid) AS netid_count
-FROM small_test
+    rtt
+FROM full_table
 WHERE hostid IN (
     SELECT hostid
-    FROM small_test
+    FROM full_table
     WHERE entropy > 0.5 AND is_slaac = False
     GROUP BY hostid
-    HAVING COUNT(DISTINCT netid) > 1
+    HAVING COUNT(netid) > 1
 );
 
 select hostid, entropy, occurrence_count, subnetpfx, netid, srcip, hoplim, rtt, ICMPv6Type, ICMPv6Code from duplicate_hostids order by entropy desc, hostid desc;
