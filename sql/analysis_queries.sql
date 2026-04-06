@@ -1,3 +1,8 @@
+CREATE INDEX IF NOT EXISTS filtered_:tbl ON :tbl(is_slaac, entropy)
+    WHERE entropy > 0.5 AND is_slaac = False;
+
+CREATE INDEX IF NOT EXISTS hostid_idx_:tbl ON :tbl (hostid);
+
 # create a table on just the host ids that are duplicated
 CREATE MATERIALIZED VIEW IF NOT EXISTS duplicate_hostids AS
 SELECT
@@ -61,7 +66,8 @@ SELECT
     d.icmpv6code,
     d.rtt
 FROM duplicate_hostids d
-JOIN pfx2as2org p ON p.prefix >>= d.subnetpfx;
+LEFT JOIN pfx2as2org p
+ON p.prefix >>= d.subnetpfx;
 
 -- select hostid, entropy, occurrence_count, subnetpfx, netid, asn from hostid_to_asn order by entropy desc, hostid desc;
 

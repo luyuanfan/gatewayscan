@@ -63,11 +63,6 @@ Import CAIDA's as2org dataset:
 ./import/as2org.sh
 ```
 
-Create indexes on (is_slaac = False, entropy > 0.5) and (hostid):
-```bash
-nohup python3 create_index.py <tablename> &
-```
-
 ## Analyze data
 
 All queries are placed in `sql/analysis_queries.sql`. Put them in `querier.sh` and do the following to make it run in the background:

@@ -3,26 +3,23 @@
 dbcommand="psql -h localhost -p 6789"
 
 $dbcommand <<EOF
-CREATE MATERIALIZED VIEW IF NOT EXISTS duplicate_hostids AS
-    SELECT
-        hostid,
-        entropy,
-        COUNT(*) OVER (PARTITION BY hostid) AS occurrence_count,
-        subnetpfx,
-        netid,
-        COUNT(netid) OVER (PARTITION BY hostid) AS netid_count,
-        tgtip,
-        srcip,
-        hoplim,
-        icmpv6type,
-        icmpv6code,
-        rtt
-    FROM full_table
-    WHERE hostid IN (
-        SELECT hostid
-        FROM full_table
-        WHERE entropy > 0.5 AND is_slaac = False
-        GROUP BY hostid
-        HAVING COUNT(netid) > 1
-    ); 
+CREATE MATERIALIZED VIEW IF NOT EXISTS duplicated_hostids_to_asn AS
+SELECT
+    d.hostid,
+    d.entropy,
+    d.occurrence_count,
+    d.subnetpfx,
+    p.prefix AS caida_pfx,
+    p.asn AS as_number,
+    d.netid,
+    d.netid_count,
+    d.tgtip,
+    d.srcip,
+    d.hoplim,
+    d.icmpv6type,
+    d.icmpv6code,
+    d.rtt
+FROM duplicate_hostids d
+LEFT JOIN pfx2as2org p
+ON p.prefix >>= d.subnetpfx;
 EOF
