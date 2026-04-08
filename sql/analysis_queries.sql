@@ -1,33 +1,33 @@
-CREATE INDEX IF NOT EXISTS filtered_:tbl ON :tbl(is_slaac, entropy)
-    WHERE entropy > 0.5 AND is_slaac = False;
+create index if not exists filtered_:tbl on :tbl(is_slaac, entropy)
+    where entropy > 0.5 and is_slaac = false;
 
-CREATE INDEX IF NOT EXISTS hostid_idx_:tbl ON :tbl (hostid);
+create index if not exists hostid_idx_:tbl on :tbl (hostid);
 
 # create a table on just the host ids that are duplicated
-CREATE MATERIALIZED VIEW IF NOT EXISTS duplicate_hostids AS
-SELECT
+create materialized view if not exists duplicate_hostids as
+select
     hostid,
     entropy,
-    COUNT(*) OVER (PARTITION BY hostid) AS occurrence_count,
+    count(*) over (partition by hostid) as occurrence_count,
     subnetpfx,
     netid,
-    COUNT(netid) OVER (PARTITION BY hostid) AS netid_count,
+    count(netid) over (partition by hostid) as netid_count,
     tgtip,
     srcip,
     hoplim,
     icmpv6type,
     icmpv6code,
     rtt
-FROM full_table
-WHERE hostid IN (
-    SELECT hostid
-    FROM full_table
-    WHERE entropy > 0.5 AND is_slaac = False
-    GROUP BY hostid
-    HAVING COUNT(netid) > 1
+from full_table
+where hostid in (
+    select hostid
+    from full_table
+    where entropy > 0.5 and is_slaac = false
+    group by hostid
+    having count(netid) > 1
 );
 
-select hostid, entropy, occurrence_count, subnetpfx, netid, srcip, hoplim, rtt, ICMPv6Type, ICMPv6Code from duplicate_hostids order by entropy desc, hostid desc;
+select hostid, entropy, occurrence_count, subnetpfx, netid, srcip, hoplim, rtt, icmpv6type, icmpv6code from duplicate_hostids order by entropy desc, hostid desc;
 
 create index if not exists duplicated_hostids_idx on duplicate_hostids (hostid);
 
@@ -37,7 +37,7 @@ create table if not exists pfx2as2org
 as (
     select
         pfx2as.prefix,
-        pfx2as.PrefixLen,
+        pfx2as.prefixlen,
         pfx2as.asn,
         as2org.autname,
         as2org.orgname,
@@ -48,15 +48,20 @@ as (
     on pfx2as.asn = as2org.aut
 );
 
-# mapping each duplicated hostid prefix to asn
-CREATE MATERIALIZED VIEW IF NOT EXISTS duplicated_hostids_to_asn AS
-SELECT
+# mapping each duplicated hostid prefix to asn and organziation
+create materialized view if not exists duplicated_hostids_to_asn_org as
+select
     d.hostid,
     d.entropy,
     d.occurrence_count,
     d.subnetpfx,
-    p.prefix AS caida_pfx,
-    p.asn AS as_number,
+    p.prefix as caida_pfx,
+    p.prefixlen as caida_pfx_len,
+    p.asn as as_number,
+    p.autname as aut_name,
+    p.orgname as oranization_name,
+    p.orgid,
+    p.country,
     d.netid,
     d.netid_count,
     d.tgtip,
@@ -65,27 +70,8 @@ SELECT
     d.icmpv6type,
     d.icmpv6code,
     d.rtt
-FROM duplicate_hostids d
-LEFT JOIN pfx2as2org p
-ON p.prefix >>= d.subnetpfx;
-
--- select hostid, entropy, occurrence_count, subnetpfx, netid, asn from hostid_to_asn order by entropy desc, hostid desc;
-
-# mapping these asn to organization
-CREATE MATERIALIZED VIEW IF NOT EXISTS hostid_to_org AS
-SELECT
-    d.hostid,
-    d.subnetpfx,
-    d.netid,
-    d.entropy,
-    d.occurrence_count,
-    d.prefix,
-    d.asn,
-    a.autname,
-    a.orgid,
-    a.orgname,
-    a.country
-FROM duplicated_hostids_to_asn d
-JOIN as2org a ON a.aut = d.asn;
+from duplicate_hostids d
+left join pfx2as2org p
+on p.prefix >>= d.subnetpfx;
 
 select hostid, entropy, occurrence_count, subnetpfx, netid, asn, orgid, orgname, country from hostid_to_org order by entropy desc, hostid desc;
