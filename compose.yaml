@@ -9,15 +9,12 @@ services:
     ports:
       - 6789:5432
     restart: always
-    # set shared memory limit when using docker compose
-    # shm_size: 128mb
-    # or set shared memory limit when deploy via swarm stack
     volumes:
      - type: bind
-       source: /dbdata
-       target: /dbdata
+       source: /cdbdata
+       target: /cdbdata
      - type: bind
-       source: /dbdata/pgdata
+       source: /cdbdata/pgdata
        target: /var/lib/postgresql/data
     environment:
       POSTGRES_USER: lyspfan
