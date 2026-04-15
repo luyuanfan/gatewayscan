@@ -8,3 +8,4 @@ notes.md
 *.txt
 playground/worldmap.ipynb
 ./querier.sh
+sniffer.md

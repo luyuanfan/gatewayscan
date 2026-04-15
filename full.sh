@@ -28,7 +28,7 @@ create index if not exists hostid_idx_full_table2 on full_table2 (hostid);
 EOF
 echo 'creating a table on just the host ids that are duplicated'
 psql -h localhost -p 6789 <<EOF
-create materialized view if not exists duplicate_hostids as
+create materialized view if not exists duplicate_hostids as 
 select
     hostid,
     entropy,
