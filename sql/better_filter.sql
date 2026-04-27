@@ -2,7 +2,7 @@
 
 -- worker 1
 -- wanna remove all entries in table 1 that starts with eight zeros in a row
-create materialized view dup_hostids_to_org_p1 as
+create materialized view better_filter_to_org_p1 as
 select distinct on (d.hostid, d.netid, p.orgid)
     d.hostid,
     d.entropy,
@@ -22,15 +22,14 @@ select distinct on (d.hostid, d.netid, p.orgid)
     d.icmpv6type,
     d.icmpv6code,
     d.rtt
-from dup_hostids d
+from better_filter d
 left join pfx2as2org p on p.prefix >>= d.netid
 where
     d.hostid < '1'
-    and not substring(d.hostid from 1 for 8) like '%00000000%'
 order by d.hostid, d.netid, p.orgid;
 
 -- worker 2
-create materialized view dup_hostids_to_org_p2 as
+create materialized view better_filter_to_org_p2 as
 select distinct on (d.hostid, d.netid, p.orgid)
     d.hostid,
     d.entropy,
@@ -50,16 +49,15 @@ select distinct on (d.hostid, d.netid, p.orgid)
     d.icmpv6type,
     d.icmpv6code,
     d.rtt
-from dup_hostids d
+from better_filter d
 left join pfx2as2org p on p.prefix >>= d.netid
 where
     d.hostid >= '1'
     and d.hostid < '8'
-    and not substring(d.hostid from 1 for 8) like '%00000000%'
 order by d.hostid, d.netid, p.orgid;
 
 -- worker 3
-create materialized view dup_hostids_to_org_p3 as
+create materialized view better_filter_to_org_p3 as
 select distinct on (d.hostid, d.netid, p.orgid)
     d.hostid,
     d.entropy,
@@ -80,23 +78,20 @@ select distinct on (d.hostid, d.netid, p.orgid)
     d.icmpv6code,
     d.rtt
 from
-    dup_hostids d
+    better_filter d
     left join pfx2as2org p on p.prefix >>= d.netid
 where
     d.hostid >= '8'
-    and not substring(d.hostid from 1 for 8) like '%00000000%'
 order by d.hostid, d.netid, p.orgid;
 
 -- chain tables together
-create materialized view if not exists dup_hostids_to_asn_org as (
-select * from dup_hostids_to_org_p1
+create materialized view if not exists better_filter_to_asn_org as (
+select * from better_filter_to_org_p1
 union all
-select * from dup_hostids_to_org_p2
+select * from better_filter_to_org_p2
 union all
-select * from dup_hostids_to_org_p3
+select * from better_filter_to_org_p3
 );
 
-create index if not exists pall_orgid_idx on dup_hostids_to_asn_org (orgid);
-create index if not exists pall_hostid_idx on dup_hostids_to_asn_org (hostid);
-
-
+create index if not exists pall_orgid_idx on better_filter_to_asn_org (orgid);
+create index if not exists pall_hostid_idx on better_filter_to_asn_org (hostid);
