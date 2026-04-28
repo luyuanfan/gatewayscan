@@ -11,15 +11,15 @@ group by first_char
 order by first_char;
 
 # count the number of repeated hostids
-select count (distinct hostid) from dup_hostids:x
+select count (distinct hostid) from better_filter;
 
 # get their entropy as well
 create materialized view if not exists list_of_dup_ids as 
 select hostid, max(entropy) as entropy
-from dup_hostids
+from better_filter
 group by hostid;
 
-
+####### PATTERNS BELOW
 # patterns
 # 00000000%
 # 00010000%
@@ -27,7 +27,6 @@ group by hostid;
 # 00010002%
 # 00020001%
 # 00020002%
-
 substring(hostid from 7 for 5) = 'ff0fe'
 # 002416ff0fe%
 # 861c70ff0fe%
@@ -40,8 +39,8 @@ substring(hostid from 7 for 5) = 'ff0fe'
 # 8eeefdff0fe%
 # 9a9d39ff0fe%
 # 80000%
-# only contains numbers?
-
-
+# only contains numbers? yup those are out too
 # not gonna filter out these? not sure? 
-# 80000?
+# also gonna filter out those who falls out of range
+
+# might also wanna organize them into like a hostid each followed by a bunch of netids
