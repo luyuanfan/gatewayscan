@@ -38,6 +38,15 @@ select
             'ASes', as_number,
             'countries', country
         )
-    ) as info
+    ) as info,
+    count (distinct country) as distinct_countries,
+    array_agg(country) as countries,
+    count (distinct oranization_name) as distinct_orgs,
+    array_agg(oranization_name) as orgs,
+    count (distinct as_number) as distinct_ases,
+    array_agg(as_number) as ASes
 from funny_ones_mapped
 group by hostid, entropy, distinct_net_occurence;
+
+# order them
+select * from funny_grouped order by distinct_net_occurence desc;
