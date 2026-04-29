@@ -25,7 +25,7 @@ select
     distinct_net_occurence,
     jsonb_agg(
         json_build_object(
-            'nets', net_,
+            'net', netid,
             'organizations', oranization_name,
             'ASes', as_number,
             'countries', country

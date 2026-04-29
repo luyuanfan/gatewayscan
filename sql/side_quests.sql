@@ -26,3 +26,18 @@ from funny_ones f
 left join pfx2as2org p on p.prefix >>= f.netid
 order by f.hostid, f.netid, p.orgid;
 
+create materialized view if not exists funny_grouped as
+select
+    hostid,
+    entropy,
+    distinct_net_occurence,
+    jsonb_agg(
+        json_build_object(
+            'net', netid,
+            'organizations', oranization_name,
+            'ASes', as_number,
+            'countries', country
+        )
+    ) as info
+from funny_ones_mapped
+group by hostid, entropy, distinct_net_occurence;
