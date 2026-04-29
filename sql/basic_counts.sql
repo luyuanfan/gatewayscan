@@ -30,8 +30,23 @@ select
             'ASes', as_number,
             'countries', country
         )
-    ) as info
+    ) as info,
+    count (distinct country) as distinct_countries,
+    array_agg(country) as countries,
+    count (distinct oranization_name) as distinct_orgs,
+    array_agg(oranization_name) as orgs,
+    count (distinct as_number) as distinct_ases,
+    array_agg(as_number) as ASes
 from better_filter_mapped
 group by hostid, entropy, distinct_net_occurence;
 
-select * from dups_grouped order by distinct_net_occurence;
+# use it with the client-side cmd below
+select * from dups_grouped order by distinct_net_occurence desc;
+# psql -h localhost -p 6789 -c "\copy (select * from dups_grouped order by entropy desc, distinct_net_occurence desc) to /home/lyspfan/gatewayscan/data/grouped_ordered.csv
+
+# we wanna do another grouping thing but this time we only want the group with US organizations in them
+create materialized view if not exists us_grouped as 
+select * from dups_grouped where 'US'=ANY(countries);
+
+select * from us_grouped order by distinct_net_occurence desc;
+# psql -h localhost -p 6789 -c "\copy (select * from us_grouped order by entropy desc, distinct_net_occurence desc) to /home/lyspfan/gatewayscan/data/us_grouped_ordered.csv
