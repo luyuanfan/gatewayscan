@@ -1,46 +1,37 @@
--- get a count of the total number of entries
-select count(*) from dup_hostids;
-
--- check the percentage
-select 
-    substring(hostid, 1, 1) as first_char,
-    count(*) as cnt,
-    round(count(*) * 100.0 / 3268577207, 2) as pct
-from dup_hostids
-group by first_char
-order by first_char;
-
--- count the number of repeated hostids
-select count (distinct hostid) from better_filter;
-
--- get their entropy as well
+# get a list of repeated hostids
 create materialized view if not exists list_of_dup_ids as 
-select hostid, max(entropy) as entropy
-from better_filter
-group by hostid;
+select distinct hostid
+from better_filter_mapped;
 
--------------- PATTERNS BELOW
--- patterns
--- 00000000%
--- 00010000%
--- 00010001%
--- 00010002%
--- 00020001%
--- 00020002%
-substring(hostid from 7 for 5) = 'ff0fe'
--- 002416ff0fe%
--- 861c70ff0fe%
--- 8627b6ff0fe%
--- 8687ffff0fe%
--- 7e6a60ff0fe%
--- c22d2eff0fe%
--- 867adfff0fe%
--- 8ee117ff0fe%
--- 8eeefdff0fe%
--- 9a9d39ff0fe%
--- 80000%
--- only contains numbers? yup those are out too
--- not gonna filter out these? not sure? 
--- also gonna filter out those who falls out of range
+# get a count of the repeated hostids
+select count (hostid) from better_filter_mapped;
 
--- might also wanna organize them into like a hostid each followed by a bunch of netids
+# get a count of across how many organizations
+select count (distinct orgid) from better_filter_mapped;
+
+# get a count of unique ASes
+select count (distinct as_number) from better_filter_mapped;
+
+# get a sense of what countries they come from
+create materialized view if not exists countries_we_see as
+select distinct country
+from better_filter_mapped;
+
+# organize it such that each hostids is followed by a little list of organization info
+create materialized view if not exists dups_grouped as
+select
+    hostid,
+    entropy,
+    distinct_net_occurence,
+    jsonb_agg(
+        json_build_object(
+            'nets', net_,
+            'organizations', oranization_name,
+            'ASes', as_number,
+            'countries', country
+        )
+    ) as info
+from better_filter_mapped
+group by hostid, entropy, distinct_net_occurence;
+
+select * from dups_grouped order by distinct_net_occurence;
