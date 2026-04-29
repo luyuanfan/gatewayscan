@@ -26,7 +26,6 @@ from dup_hostids d
 left join pfx2as2org p on p.prefix >>= d.netid
 where
     d.hostid < '1'
-    and not substring(d.hostid from 1 for 8) like '%00000000%'
 order by d.hostid, d.netid, p.orgid;
 
 -- worker 2
@@ -55,7 +54,6 @@ left join pfx2as2org p on p.prefix >>= d.netid
 where
     d.hostid >= '1'
     and d.hostid < '8'
-    and not substring(d.hostid from 1 for 8) like '%00000000%'
 order by d.hostid, d.netid, p.orgid;
 
 -- worker 3
@@ -84,7 +82,6 @@ from
     left join pfx2as2org p on p.prefix >>= d.netid
 where
     d.hostid >= '8'
-    and not substring(d.hostid from 1 for 8) like '%00000000%'
 order by d.hostid, d.netid, p.orgid;
 
 -- chain tables together
@@ -98,5 +95,3 @@ select * from dup_hostids_to_org_p3
 
 create index if not exists pall_orgid_idx on dup_hostids_to_asn_org (orgid);
 create index if not exists pall_hostid_idx on dup_hostids_to_asn_org (hostid);
-
-

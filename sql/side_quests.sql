@@ -9,7 +9,7 @@ create index if not exists funny_ones_netid_gist_idx on funny_ones using gist (n
 create index if not exists funny_ones_netid_idx on funny_ones (netid);
 
 create materialized view if not exists funny_ones_mapped as
-select
+select distinct on (f.hostid, f.netid, p.orgid)
     f.hostid,
     f.entropy,
     f.netid,
@@ -23,4 +23,6 @@ select
     p.orgid,
     p.country
 from funny_ones f
-left join pfx2as2org p on p.prefix >>= f.netid;
+left join pfx2as2org p on p.prefix >>= f.netid
+order by f.hostid, f.netid, p.orgid;
+
