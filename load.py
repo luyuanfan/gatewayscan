@@ -1,6 +1,5 @@
 import os
 import io
-import sys
 import time
 import socket
 import binascii
@@ -12,9 +11,6 @@ import pandas as pd
 from math import log2
 from tqdm import tqdm
 import multiprocessing as mp
-from datetime import datetime
-from collections import Counter
-from scipy.stats import entropy
 
 full_chunk_dir="/dbdata/chunks"
 test_chunk_dir="data/chunks"

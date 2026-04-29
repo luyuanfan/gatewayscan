@@ -49,4 +49,5 @@ from funny_ones_mapped
 group by hostid, entropy, distinct_net_occurence;
 
 # order them
-select * from funny_grouped order by distinct_net_occurence desc;
+select * from funny_grouped order by distinct_countries desc;
+# psql -h localhost -p 6789 -c "\copy (select * from funny_grouped order by distinct_countries desc) to /home/lyspfan/gatewayscan/data/funny_grouped_ordered.csv

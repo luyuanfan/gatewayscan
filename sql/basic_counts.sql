@@ -48,5 +48,5 @@ select * from dups_grouped order by distinct_net_occurence desc;
 create materialized view if not exists us_grouped as 
 select * from dups_grouped where 'US'=ANY(countries);
 
-select * from us_grouped order by distinct_net_occurence desc;
-# psql -h localhost -p 6789 -c "\copy (select * from us_grouped order by entropy desc, distinct_net_occurence desc) to /home/lyspfan/gatewayscan/data/us_grouped_ordered.csv
+select * from us_grouped order by distinct_net_occurence desc, entropy desc;
+# psql -h localhost -p 6789 -c "\copy (select * from us_grouped order by distinct_net_occurence desc, entropy desc) to '/home/lyspfan/gatewayscan/data/us_grouped_ordered.csv' with csv header"
