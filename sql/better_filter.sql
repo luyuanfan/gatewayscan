@@ -84,3 +84,4 @@ create index if not exists better_filter_mapped_hostid_idx on better_filter_mapp
 create index if not exists better_filter_mapped_netid_idx on better_filter_mapped (netid);
 create index if not exists better_filter_mapped_orgid_idx on better_filter_mapped (orgid);
 create index if not exists better_filter_mapped_asnum_idx on better_filter_mapped (as_number);
+create index if not exists better_filter_mapped_orgname_idx on better_filter_mapped (oranization_name);

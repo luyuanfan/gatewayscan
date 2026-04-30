@@ -56,3 +56,37 @@ create materialized view if not exists us_orgs as
 select distinct oranization_name
 from better_filter_mapped
 where country = 'US';
+
+# for each of the US organizations out there, we want to see how many UUID they own are having collisions,
+# and we want to order them by how many collisions there are
+# HONESTLY this query does not give much useful information other than we have things ordered nicely
+create materialized view if not exists us_orgs_ranked as
+select 
+    oranization_name,
+    country, 
+    array_agg(distinct hostid) as hostid_list,
+    count (distinct hostid) as colliding_hostid_count,
+    (sum(distinct_net_occurence) - count (*)) as collided_nets_count
+from better_filter_mapped
+group by oranization_name, country
+having country = 'US';
+
+select * from us_orgs_ranked order by colliding_hostid_count desc, collided_nets_count desc;
+
+# doing the same type of counting but for the whole world instead
+# TODO: seeing the results i'd say it needs more filtering for the zero paddings
+create materialized view if not exists all_orgs_ranked as
+select 
+    oranization_name,
+    array_agg(distinct hostid) as hostid_list,
+    count (distinct hostid) as colliding_hostid_count,
+    (sum(distinct_net_occurence) - count (*)) as collided_nets_count
+from better_filter_mapped
+group by oranization_name;
+
+select * from all_orgs_ranked order by colliding_hostid_count desc, collided_nets_count desc;
+
+# for each of the organizations, we can run the anderson test, which can help us get a better sense whether
+# they were drawn from an uniform distribution
+
+# after that or before that, we can do a 1-0 ratio test
