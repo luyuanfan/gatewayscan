@@ -6,5 +6,5 @@ data/*
 notes.md
 *.pfx2as
 *.txt
-./querier.sh
-secrets/
+querier.sh
+secrets.sql
