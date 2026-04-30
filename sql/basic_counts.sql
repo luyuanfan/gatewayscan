@@ -50,3 +50,9 @@ select * from dups_grouped where 'US'=ANY(countries);
 
 select * from us_grouped order by distinct_net_occurence desc, entropy desc;
 # psql -h localhost -p 6789 -c "\copy (select * from us_grouped order by distinct_net_occurence desc, entropy desc) to '/home/lyspfan/gatewayscan/data/us_grouped_ordered.csv' with csv header"
+
+# just get the names of the US organizations
+create materialized view if not exists us_orgs as
+select distinct oranization_name
+from better_filter_mapped
+where country = 'US';

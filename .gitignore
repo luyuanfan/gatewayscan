@@ -6,6 +6,5 @@ data/*
 notes.md
 *.pfx2as
 *.txt
-playground/worldmap.ipynb
 ./querier.sh
-sniffer.md
+secrets/
