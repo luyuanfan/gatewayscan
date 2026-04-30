@@ -87,6 +87,13 @@ group by oranization_name;
 select * from all_orgs_ranked order by colliding_hostid_count desc, collided_nets_count desc;
 
 # for each of the organizations, we can run the anderson test, which can help us get a better sense whether
-# they were drawn from an uniform distribution
+# they were drawn from an uniform distribution. we don't even want to get the distinct hostid from them.
+# take them as is and do a test to at least filter out some orgs that are in disguise?
+# BUT THAT DOESN'T MAKE SENSE.
+
+# TODO: as long as we cannot get a good filter we cannot try to do a global type of summary
 
 # after that or before that, we can do a 1-0 ratio test
+
+# it's also possible that the same AS uses serveral different address assignment methods 
+# MAYBE we can draw a tree that visualize this but idk how yet
