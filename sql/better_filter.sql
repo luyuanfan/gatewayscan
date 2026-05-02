@@ -85,3 +85,23 @@ create index if not exists better_filter_mapped_netid_idx on better_filter_mappe
 create index if not exists better_filter_mapped_orgid_idx on better_filter_mapped (orgid);
 create index if not exists better_filter_mapped_asnum_idx on better_filter_mapped (as_number);
 create index if not exists better_filter_mapped_orgname_idx on better_filter_mapped (oranization_name);
+
+create table if not exists hostid_ratio as
+select
+  hostid, 
+  NULLIF(bit_count(convert_to(hostid, 'UTF8'))::numeric / bit_length(convert_to(hostid, 'UTF8')), 0) as ratio
+from better_filter_mapped;
+
+create table if not exists qualifying_iids_two_stddev as
+select
+  hostid,
+  ratio
+from hostid_ratio
+where ratio >= 0.375 and ratio <= 0.625;
+
+create table if not exists qualifying_iids_one_stddev as
+select
+  hostid,
+  ratio
+from hostid_ratio
+where ratio >= 0.4375 and ratio <= 0.5625;

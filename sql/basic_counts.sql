@@ -1,3 +1,31 @@
+# from full_table, let's get a sense of k
+alter table full_table
+add column random_looking boolean
+default false;
+
+alter table full_table
+add column ratio float
+default 0;
+
+update full_table
+set random_looking = true
+where
+    entropy > 0.5
+    and is_slaac = false
+    and hostid !~ '^(00000000|00010000|00010001|00010002|00020001|00020002|80000)'
+    and hostid !~ '^[0-9]{16}$'
+    and substring(hostid from 7 for 5) <> 'ff0fe'
+    and hostid not like '%0000%';
+
+create index if not exists full_table_random_idx
+on full_table(random_looking)
+where random_looking = true;
+
+update full_table
+set ratio = NULLIF(bit_count(convert_to(hostid, 'UTF8'))::numeric / bit_length(convert_to(hostid, 'UTF8')), 0)
+where random_looking = true;
+
+
 # get a list of repeated hostids
 create materialized view if not exists list_of_dup_ids as 
 select distinct hostid
@@ -97,3 +125,8 @@ select * from all_orgs_ranked order by colliding_hostid_count desc, collided_net
 
 # it's also possible that the same AS uses serveral different address assignment methods 
 # MAYBE we can draw a tree that visualize this but idk how yet
+
+# at least for each of the organizations that we are suspecting we can try to run a k-s test on them
+
+# for each of the ASes we can also try to see if they use slaac, if they do, we'd be able to see the 
+# manufracturer identifiers from the mac address, hopefully
