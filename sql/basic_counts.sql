@@ -32,7 +32,7 @@ select distinct hostid
 from better_filter_mapped;
 
 # get a count of the repeated hostids
-select count (hostid) from better_filter_mapped;
+select count (distinct hostid) from better_filter_mapped;
 
 # get a count of across how many organizations
 select count (distinct orgid) from better_filter_mapped;
@@ -130,3 +130,12 @@ select * from all_orgs_ranked order by colliding_hostid_count desc, collided_net
 
 # for each of the ASes we can also try to see if they use slaac, if they do, we'd be able to see the 
 # manufracturer identifiers from the mac address, hopefully
+
+select count(distinct hostid) from better_filter;
+select count(distinct hostid) from qualifying_iids_one_stddev;
+
+select * from dups_grouped 
+where
+	substring(hostid from 7 for 5) <> 'ff0f0'
+	and substring(hostid from 5 for 6) <> 'eeff0f'
+order by distinct_net_occurence desc limit 30;
