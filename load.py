@@ -21,9 +21,36 @@ db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan
 _BAD_PFX = re.compile(r'^(00000|00010000|00010001|00010002|00020001|00020002|80000|96e3eeff0f)')
 _ALL_DIGS = re.compile(r'^[0-9]{16}$')
 
-def guess_router_type(tgtip, srcip):
-    pass
-
+'''
+(assuming home network size being /56 and longer)
+(and ISP network size being /32 or /48)
+router type       code (small int)
+unknown                         0
+timeout                         1
+homerouter                      2
+isp aggregate                   3
+backbone                        4
+'''
+def guess_router_type(spl, icmpv6type, icmpv6code, pfxlen):
+    # timeout possibly due to routing loop
+    if icmpv6type == 3:
+        return 1
+    # "Destination Unreachable: address unreachable"
+    elif icmpv6type == 1 and icmpv6code == 3:
+        if spl >= pfxlen: 
+            return 2
+        else 
+            return 3
+    # "Destination Unreachable: no route to destination"
+    elif icmpv6type == 1 and icmpv6code == 0: 
+        if spl >= pfxlen:
+            return 2
+        if spl >= 32:
+            return 4
+        else:
+            return 3
+    else:
+        return 0
 
 '''
 policy name     code (small int)
@@ -31,18 +58,18 @@ unknown                       0
 slaac_eui64                   1
 bad_slaac_eui64               2
 static prefix                 3
-embedded v4                   4
+decimal                       4
 slaac_pe                      5
 '''
 def guess_policy(hid, entropy, ratio):
+    if _ALL_DIGS.match(hid):
+        return 4
     if hid[6:10] == "fffe":
         return 1
     elif hid[6:11] == "ff0fe" or hid[6:11] == "ff0f0":
         return 2
     elif _BAD_PFX.match(hid):
         return 3
-    elif _ALL_DIGS.match(hid):
-        return 4
     elif (entropy >= 0.7) and (0.375 <= ratio <= 0.625):
         return 5
     else
