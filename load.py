@@ -1,5 +1,6 @@
 import os
 import io
+import re
 import time
 import socket
 import binascii
@@ -17,6 +18,35 @@ test_chunk_dir="data/chunks"
 nproc=40
 dbcommand="psql -h localhost -p 6789"
 db_args = "host=localhost port=6789 dbname=lyspfan user=lyspfan password=lyspfan"
+_BAD_PFX = re.compile(r'^(00000|00010000|00010001|00010002|00020001|00020002|80000|96e3eeff0f)')
+_ALL_DIGS = re.compile(r'^[0-9]{16}$')
+
+def guess_router_type(tgtip, srcip):
+    pass
+
+
+'''
+policy name     code (small int)
+unknown                       0
+slaac_eui64                   1
+bad_slaac_eui64               2
+static prefix                 3
+embedded v4                   4
+slaac_pe                      5
+'''
+def guess_policy(hid, entropy, ratio):
+    if hid[6:10] == "fffe":
+        return 1
+    elif hid[6:11] == "ff0fe" or hid[6:11] == "ff0f0":
+        return 2
+    elif _BAD_PFX.match(hid):
+        return 3
+    elif _ALL_DIGS.match(hid):
+        return 4
+    elif (entropy >= 0.7) and (0.375 <= ratio <= 0.625):
+        return 5
+    else
+        return 0
 
 def entropy_hex(hid):
     _, counts = np.unique(list(hid), return_counts=True)
